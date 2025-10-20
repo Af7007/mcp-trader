@@ -1,0 +1,31 @@
+{
+  "name": "mcp-trader",
+  "version": "1.0.0",
+  "description": "MCP Server for MetaTrader MLP Trading System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --dev",
+    "test": "node test-client.js",
+    "test:health": "node test-client.js --health",
+    "tools": "node test-client.js --tools"
+  },
+  "keywords": [
+    "mcp",
+    "metatrader",
+    "trading",
+    "mlp",
+    "ai",
+    "chatbot"
+  ],
+  "author": "MLP Trading System",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.1",
+    "axios": "^1.12.2",
+    "express": "^5.1.0",
+    "mcp": "^1.4.2",
+    "ws": "^8.18.3"
+  },
+  "type": "module"
+}
