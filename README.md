@@ -1,260 +1,310 @@
-# MCP Trader Server
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/qoyyuum-mcp-metatrader5-server-badge.png)](https://mseep.ai/app/qoyyuum-mcp-metatrader5-server)
 
-Servidor MCP (Model Context Protocol) que conecta MetaTrader 5, sistema MLP AI e banco de dados Django em uma interface integrada para chatbots e LLMs.
+[![codecov](https://codecov.io/github/Qoyyuum/mcp-metatrader5-server/graph/badge.svg?token=SRECTEZUAR)](https://codecov.io/github/Qoyyuum/mcp-metatrader5-server)
 
-## 🏗️ Arquitetura
+[![PyPI version](https://badge.fury.io/py/mcp-metatrader5-server.svg)](https://pypi.org/project/mcp-metatrader5-server/)
 
-```
-Chatbot (Claude/GPT-4) ↔ MCP Server ↔ MT5 + MLP + Database
-                                      ^       ^       ^
-                                      |       |       |
-                              Dados Tempo Real    Predições Inteligentes
-```
+# MetaTrader 5 MCP Server
 
-## 🚀 Instalação
+A Model Context Protocol (MCP) server for MetaTrader 5, allowing AI assistants to interact with the MetaTrader 5 platform for trading and market data analysis. [Documentation](https://mcp-metatrader5-server.readthedocs.io)
 
-### Requisitos
-- Node.js >= 16.0.0
-- Acesso aos APIs: MT5 (porta 5000), MLP (porta 5000), Django (porta 5001)
+## Features
 
-### Instalação
+- Connect to MetaTrader 5 terminal
+- Access market data (symbols, rates, ticks)
+- Place and manage trades
+- Analyze trading history
+- Integrate with AI assistants through the Model Context Protocol
+
+## Installation
+
+### From PyPI 
+
 ```bash
-# Na pasta raíz do projeto
-mkdir mcp-trader
-cd mcp-trader
-
-# Inicializar projeto
-npm init -y
-
-# Instalar dependências
-npm install
+uvx --from mcp-metatrader5-server mt5mcp
 ```
 
-### Arquivos Gerados
+### From Source
 
-Após a instalação, a estrutura ficará:
-```
-mcp-trader/
-├── server.js              ← Servidor MCP principal
-├── mt5-connector.js       ← API MetaTrader 5
-├── mlp-connector.js       ← Sistema de sinais MLP
-├── db-connector.js        ← Banco de dados Django
-├── test-client.js         ← Cliente para testes
-├── prompts/
-│   ├── trading.txt        ← Template para trading
-│   └── analysis.txt       ← Template para análise
-├── package.json           ← Configurações Node.js
-└── README.md             ← Este arquivo
-```
-
-## 🛠️ Ferramentas MCP Disponíveis
-
-| Ferramenta | Descrição | Parâmetros |
-|------------|-----------|------------|
-| `get_market_data` | Dados em tempo real MT5 | `{symbol: 'BTCUSDc'}` |
-| `get_mlp_signal` | Sinal atual MLP AI | `{symbol: 'BTCUSDc'}` |
-| `get_trade_history` | Histórico de trades | `{limit: 10}` |
-| `execute_trade` | Executar trade via MLP | `{signal, symbol, volume}` |
-| `get_performance` | Métricas de performance | - |
-| `train_mlp_model` | Re-treinar modelo | `{symbols, days}` |
-| `get_portfolio` | Status do portfólio | - |
-| `get_bot_status` | Status do sistema | - |
-
-## 🎯 Uso com Claude/GPT
-
-### Configuração Básica
 ```bash
-# Executar o servidor MCP
-cd mcp-trader
-npm start
+git clone https://github.com/Qoyyuum/mcp-metatrader5-server.git
+cd mcp-metatrader5-server
+uv sync
+uv run mt5mcp
 ```
 
-### Comandos de Exemplo no Chat
+## Requirements
+
+- **uv** (recommended) or pip
+- **Python 3.11 or higher**
+- **MetaTrader 5 terminal** installed on Windows
+- **MetaTrader 5 account** (demo or real)
+
+## Usage
+
+### Quick Start
+
+The server runs in **stdio mode** by default for MCP clients like Claude Desktop:
+
+```bash
+uv run mt5mcp
 ```
-"Qual é o preço atual do BTC?"
-"Mostre o sinal de trading do MLP"
-"Quais meus últimos 5 trades?"
-"Execute uma compra se confiança >80%"
-"Como está performando o sistema?"
-"Re-treine o modelo com dados dos últimos 15 dias"
+
+### Development Mode (HTTP)
+
+For testing with HTTP transport, create a `.env` file:
+
+```env
+MT5_MCP_TRANSPORT=http
+MT5_MCP_HOST=127.0.0.1
+MT5_MCP_PORT=8000
 ```
 
-## 📊 Funcionalidades
+Then run:
 
-### 📈 Monitoramento em Tempo Real
-- Preços, volumes e indicadores MT5
-- Sinais MLP com análise de confiança
-- Posições abertas e P&L
+```bash
+uv run mt5mcp
+```
 
-### 🤖 IA Conversacional
-- Comandos naturais em português
-- Interpretação contextual
-- Análise automatizada de tendências
+The server will start at http://127.0.0.1:8000
 
-### 💼 Gestão de Portfolio
-- Controle de posições ativas
-- Métricas de performance
-- Balance de conta e margem
+### Installing for MCP Clients
 
-### ⚙️ Controle Operacional
-- Start/stop do bot MLP
-- Ajuste de parâmetros
-- Backup de dados
+#### Method 1: Using `uvx` (Simplest - No Installation Required) ⭐
 
-## 🔗 Conectores
+Add this configuration to your MCP client's config file:
 
-### MT5 Connector (`mt5-connector.js`)
-- 💰 **API**: `http://localhost:5000` (flask)
-- 📊 Dados: Preços, volumes, spreads
-- 🛡️ Orders: Buy/sell com TP/SL
-
-### MLP Connector (`mlp-connector.js`)
-- 🧠 **API**: `http://localhost:5000` (bot MT5)
-- 📈 Sinais: BUY/SELL/HOLD com confiança
-- 🔄 Train: Re-treinamento automático
-
-### DB Connector (`db-connector.js`)
-- 💾 **API**: `http://localhost:5001` (django)
-- 📊 Histórico: Trades, análises, P&L
-- 📋 Controle: Configurações do bot
-
-## 📝 Scripts NPM
+**For Claude Desktop** (`claude_desktop_config.json`):
 
 ```json
-{
-  "start": "node server.js",
-  "dev": "node server.js --dev"
-}
-```
-
-## 🧪 Testes
-
-### Testar Conexões
-```bash
-# Verificar se MT5 está rodando
-curl http://localhost:5000/health
-
-# Verificar MLP system
-curl http://localhost:5000/api/mlp/health
-
-# Verificar Django DB
-curl http://localhost:5001/quant/dashboard/summary/
-```
-
-### Execução Manual
-```bash
-# Iniciar servidor MCP
-npm start
-
-# Testar com ferramentas manuais (opcional)
-node -e "
-import { MCPTraderServer } from './server.js';
-const server = new MCPTraderServer();
-server.testConnections();
-"
-```
-
-## 🔐 Segurança
-
-- ✅ **Thresholds de Confiança**: Trades só acima de 70%
-- ✅ **Validação de Sinais**: Verificação múltipla MT5 + MLP
-- ✅ **Limites Operacionais**: Máximo 7 posições simultâneas
-- ✅ **Timeout de Conexão**: Proteção contra falhas
-
-## 🎨 Prompts Inteligentes (pasta prompts/)
-
-### trading.txt
-```
-Você é um assistente de trading profissional. Baseado nos dados MT5 e sinais MLP:
-
-DADOS DISPONÍVEIS:
-- Preços em tempo real
-- Indicadores técnicos (RSI, BB, SMA)
-- Sinais MLP com confiança %
-- Histórico de performance
-- Status do portfólio
-
-DIRETRIZES:
-- Seja conservador com recomendações
-- Sempre mencione nível de confiança
-- Sugira stop loss e take profit
-- Considere risco de 1-2% por trade
-- Analise tendência de curto a médio prazo
-```
-
-## 🚀 Próximas Etapas - Integração Completa
-
-### 1. Chatbot Interface (Streamlit)
-```bash
-# Criar interface de chatbot
-pip install streamlit openai anthropic
-
-# Arquivo: chatbot.py
-streamlit run chatbot.py
-```
-
-### 2. Claude Desktop Configuration
-```json
-// Arquivo: ~/.config/claude/claude_desktop_config.json
 {
   "mcpServers": {
-    "mcp-trader": {
-      "command": "cd",
-      "args": ["/path/to/mcp-trader", "&&", "npm", "start"]
+    "mcp-metatrader5-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Qoyyuum/mcp-metatrader5-server",
+        "mt5mcp"
+      ]
     }
   }
 }
 ```
 
-### 3. Comandos Avançados
-```
-"Monitore EURUSD com alertas RSI"
-"Faca análise técnica completa do BTC"
-"Mostre performance dos últimos 30 dias"
-"Gere relatório de risco atual"
-"Simule trade hipotético"
-```
+#### Method 2: Using FastMCP Install (Recommended)
 
-## 📞 Suporte
-
-### Arquivos do Sistema Completo:
-- `/mcp-trader/` ← **SERVIDOR MCP** (pasta isolada)
-- `/bot_mt5_direct.py` ← Bot Python MT5
-- `/django_server/` ← Dashboard e histórico
-- `/mlp_dashboard_mql5.mq5` ← Expert Advisor colorido
-
-### Verificação de Saúde:
 ```bash
-# Testar MCP server
-cd mcp-trader && npm test
-
-# Verificar APIs
-start_final.cmd status
-
-# Monitorar logs
-tail -f bot_mt5_direct.py.log
+git clone https://github.com/Qoyyuum/mcp-metatrader5-server
+cd mcp-metatrader5-server
 ```
 
----
+After git cloning the repo, run the following commands:
 
-## 🎯 Resumo do Sistema
+For MCP JSON format
 
-**MetaTrader MLP Trading System** é uma solução completa que combina:
+```bash
+uv run fastmcp install mcp-json src/mcp_mt5/main.py
+```
 
-### Backend:
-- **MT5 + Python**: Execução e análise técnica
-- **TensorFlow/SCIKIT**: Modelos de IA MLP treinados
-- **Django Rest**: Gestão de dados e histórico
-- **Flask API**: Conectividade com MT5
+For Claude Desktop
 
-### Frontend:
-- **MCP Server**: Protocolo para LLMs
-- **Expert Advisor**: Interface MT5 colorizada
-- **Dashboard Web**: Controle e visualização
-- **Chatbot**: Interface conversacional
+```bash
+uv run fastmcp install claude-desktop src/mcp_mt5/main.py
+```
 
-**🤖 Resultado**: Sistema de trading automatizado inteligente com controle total através de comandos naturais em português!
+For Claude Code
 
----
+```bash
+uv run fastmcp install claude-code src/mcp_mt5/main.py
+```
 
-*"O futuro do trading: IA + Automação + Controle Conversacional"* ⚡📈
+For Cursor
+
+```bash
+uv run fastmcp install cursor src/mcp_mt5/main.py
+```
+
+For Gemini CLI
+
+```bash
+uv run fastmcp install gemini-cli src/mcp_mt5/main.py
+```
+
+
+#### Method 3: Manual Configuration
+
+Add this to your `claude_desktop_config.json` or whatever LLM config file:
+
+```json
+{
+  "mcpServers": {
+    "mcp-metatrader5-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcp-metatrader5-server",
+        "mt5mcp"
+      ]
+    }
+  }
+}
+```
+
+## API Reference
+
+### Connection Management
+
+- `initialize()`: Initialize the MT5 terminal
+- `login(account, password, server)`: Log in to a trading account
+- `shutdown()`: Close the connection to the MT5 terminal
+
+### Market Data Functions
+
+- `get_symbols()`: Get all available symbols
+- `get_symbols_by_group(group)`: Get symbols by group
+- `get_symbol_info(symbol)`: Get information about a specific symbol
+- `get_symbol_info_tick(symbol)`: Get the latest tick for a symbol
+- `copy_rates_from_pos(symbol, timeframe, start_pos, count)`: Get bars from a specific position
+- `copy_rates_from_date(symbol, timeframe, date_from, count)`: Get bars from a specific date
+- `copy_rates_range(symbol, timeframe, date_from, date_to)`: Get bars within a date range
+- `copy_ticks_from_pos(symbol, start_pos, count)`: Get ticks from a specific position
+- `copy_ticks_from_date(symbol, date_from, count)`: Get ticks from a specific date
+- `copy_ticks_range(symbol, date_from, date_to)`: Get ticks within a date range
+
+### Trading Functions
+
+- `order_send(request)`: Send an order to the trade server
+- `order_check(request)`: Check if an order can be placed with the specified parameters
+- `positions_get(symbol, group)`: Get open positions
+- `positions_get_by_ticket(ticket)`: Get an open position by its ticket
+- `orders_get(symbol, group)`: Get active orders
+- `orders_get_by_ticket(ticket)`: Get an active order by its ticket
+- `history_orders_get(symbol, group, ticket, position, from_date, to_date)`: Get orders from history
+- `history_deals_get(symbol, group, ticket, position, from_date, to_date)`: Get deals from history
+
+## Example Workflows
+
+### Connecting and Getting Market Data
+
+```python
+# Initialize MT5
+initialize()
+
+# Log in to your trading account
+login(account=123456, password="your_password", server="your_server")
+
+# Get available symbols
+symbols = get_symbols()
+
+# Get recent price data for EURUSD
+rates = copy_rates_from_pos(symbol="EURUSD", timeframe=15, start_pos=0, count=100)
+
+# Shut down the connection
+shutdown()
+```
+
+### Placing a Trade
+
+```python
+# Initialize and log in
+initialize()
+login(account=123456, password="your_password", server="your_server")
+
+# Create an order request
+request = OrderRequest(
+    action=mt5.TRADE_ACTION_DEAL,
+    symbol="EURUSD",
+    volume=0.1,
+    type=mt5.ORDER_TYPE_BUY,
+    price=mt5.symbol_info_tick("EURUSD").ask,
+    deviation=20,
+    magic=123456,
+    comment="Buy order",
+    type_time=mt5.ORDER_TIME_GTC,
+    type_filling=mt5.ORDER_FILLING_IOC
+)
+
+# Send the order
+result = order_send(request)
+
+# Shut down the connection
+shutdown()
+```
+
+## Resources
+
+The server provides the following resources to help AI assistants understand how to use the MetaTrader 5 API:
+
+- `mt5://getting_started`: Basic workflow for using the MetaTrader 5 API
+- `mt5://trading_guide`: Guide for placing and managing trades
+- `mt5://market_data_guide`: Guide for accessing and analyzing market data
+- `mt5://order_types`: Information about order types
+- `mt5://order_filling_types`: Information about order filling types
+- `mt5://order_time_types`: Information about order time types
+- `mt5://trade_actions`: Information about trade request actions
+
+## Prompts
+
+The server provides the following prompts to help AI assistants interact with users:
+
+- `connect_to_mt5(account, password, server)`: Connect to MetaTrader 5 and log in
+- `analyze_market_data(symbol, timeframe)`: Analyze market data for a specific symbol
+- `place_trade(symbol, order_type, volume)`: Place a trade for a specific symbol
+- `manage_positions()`: Manage open positions
+- `analyze_trading_history(days)`: Analyze trading history
+
+## Development
+
+### Project Structure
+
+```
+mcp-metatrader5-server/
+├── src/
+│   └── mcp_mt5/
+│       ├── __init__.py      # Entry point with main()
+│       ├── main.py          # FastMCP server with all tools
+│       └── test_client.py   # Test client for development
+├── docs/
+│   ├── getting_started.md
+│   ├── market_data_guide.md
+│   ├── trading_guide.md
+│   └── publishing.md
+├── .env                     # Environment configuration (create from .env.example)
+├── README.md
+├── pyproject.toml           # Project metadata (using hatchling)
+└── uv.lock                  # Dependency lock file
+```
+
+### Building the Package
+
+Using uv (recommended):
+
+```bash
+uv build
+```
+
+This will create wheel and source distributions in the `dist/` directory.
+
+### Publishing to PyPI
+
+Using uv:
+
+```bash
+# Build first
+uv build
+
+# Publish to PyPI
+uv publish
+
+# Or publish to TestPyPI first
+uv publish --publish-url https://test.pypi.org/legacy/
+```
+
+## License
+
+MIT
+
+## Acknowledgements
+
+- [MetaQuotes](https://www.metaquotes.net/) for the MetaTrader 5 platform
+- [FastMCP](https://github.com/jlowin/fastmcp) for the MCP server implementation

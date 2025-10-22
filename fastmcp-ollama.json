@@ -1,0 +1,15 @@
+{
+  "name": "mcp-ollama-server",
+  "version": "0.1.0",
+  "server": "src/mcp_ollama/main.py:mcp",
+  "dependencies": [
+    "fastmcp==2.12.4",
+    "aiohttp>=3.9.0",
+    "pydantic>=2.11.9"
+  ],
+  "environment": {
+    "OLLAMA_MCP_TRANSPORT": "http",
+    "OLLAMA_MCP_HOST": "127.0.0.1",
+    "OLLAMA_MCP_PORT": "8001"
+  }
+}

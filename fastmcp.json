@@ -1,0 +1,34 @@
+[
+  {
+    "name": "mcp-metatrader5-server",
+    "version": "0.1.4",
+    "server": "src/mcp_mt5/main.py:mcp",
+    "dependencies": [
+      "fastmcp==2.12.5",
+      "metatrader5==5.0.5370",
+      "pandas>=2.3.3",
+      "pydantic>=2.11.9",
+      "python-dotenv>=1.1.1"
+    ],
+    "environment": {
+      "MT5_MCP_TRANSPORT": "http",
+      "MT5_MCP_HOST": "127.0.0.1",
+      "MT5_MCP_PORT": "8000"
+    }
+  },
+  {
+    "name": "mcp-ollama-server",
+    "version": "0.1.0",
+    "server": "src/mcp_ollama/main.py:mcp",
+    "dependencies": [
+      "fastmcp==2.12.5",
+      "aiohttp>=3.9.0",
+      "pydantic>=2.11.9"
+    ],
+    "environment": {
+      "OLLAMA_MCP_TRANSPORT": "http",
+      "OLLAMA_MCP_HOST": "127.0.0.1",
+      "OLLAMA_MCP_PORT": "8001"
+    }
+  }
+]

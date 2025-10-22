@@ -1,0 +1,44 @@
+{
+  "mcpServers": {
+    "github.com/upstash/context7-mcp": {
+      "autoApprove": [
+        "get-library-docs",
+        "resolve-library-id"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "YOUR_API_KEY"
+      ]
+    },
+    "mt5-mcp-server": {
+      "autoApprove": [
+        "initialize",
+        "get_symbols",
+        "get_symbol_info",
+        "get_account_info",
+        "copy_rates_from_pos",
+        "order_send",
+        "positions_get"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "build/index.js"
+      ],
+      "env": {
+        "MT5_MCP_TRANSPORT": "stdio",
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}
