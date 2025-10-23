@@ -13,38 +13,18 @@ import sys
 import os
 import time
 import logging
-import requests
-import uuid
 
 # Adicionar o diretório 'src' ao path para encontrar os módulos core
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core import database
+from core.mt5_direct_client import get_mt5_client
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("TradingWorker")
 
-MT5_MCP_URL = "http://localhost:8000/mcp"
-
-
-def call_mt5_tool(tool_name: str, **kwargs):
-    """Função síncrona para chamar uma ferramenta do MT5 MCP."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": str(uuid.uuid4()),
-        "method": "tools/call",
-        "params": {"name": tool_name, "arguments": kwargs}
-    }
-    try:
-        response = requests.post(MT5_MCP_URL, json=payload, timeout=10)
-        response.raise_for_status()
-        result = response.json()
-        if "error" in result:
-            raise Exception(f"MCP Error: {result['error']}")
-        return result.get("result")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Falha na comunicação com o MT5 MCP: {e}")
-        return None
+# Obter instância do cliente MT5 (conexão direta)
+mt5_client = get_mt5_client()
 
 
 def monitor_open_trades():
@@ -58,9 +38,9 @@ def monitor_open_trades():
         logger.info("Nenhum trade aberto para monitorar.")
         return
 
-    # Obter todas as posições abertas de uma vez para otimizar
-    active_positions_data = call_mt5_tool("positions_get")
-    if active_positions_data is None:
+    # Obter todas as posições abertas de uma vez usando cliente MCP
+    active_positions_data = mt5_client.positions_get()
+    if not active_positions_data:
         logger.error("Não foi possível obter posições ativas do MT5. Pulando ciclo.")
         return
 
@@ -74,8 +54,8 @@ def monitor_open_trades():
         if trade_ticket not in active_tickets:
             logger.info(f"Trade {trade_ticket} parece ter sido fechado. Verificando histórico.")
 
-            # Buscar o resultado no histórico de deals (negócios)
-            deals = call_mt5_tool("history_deals_get", position=trade_ticket)
+            # Buscar o resultado no histórico de deals usando cliente MCP
+            deals = mt5_client.history_deals_get(position=trade_ticket)
             if deals:
                 # Um trade pode ter múltiplos deals (abertura, fechamento, etc.)
                 # O lucro/prejuízo final é a soma dos profits de todos os deals da posição.

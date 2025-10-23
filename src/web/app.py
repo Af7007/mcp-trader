@@ -392,29 +392,36 @@ def process_message(message, use_ollama):
 def get_real_account_info():
     """Get real account information from MT5"""
     try:
-        # Try to use MT5 MCP tools directly
-        from mcp import MT5MCPClient
+        # Use centralized direct client
+        from core.mt5_direct_client import get_mt5_client
 
-        # Initialize MT5 client
-        mt5_client = MT5MCPClient()
+        # Get MT5 client instance
+        mt5_client = get_mt5_client()
 
         # Get account information using the MCP tool
         account_info = mt5_client.get_account_info()
 
-        if account_info and account_info.get("success", False):
-            info = account_info.get("result", {})
+        if account_info:
+            # Parse string result if needed
+            if isinstance(account_info, str):
+                import json
+                try:
+                    account_info = json.loads(account_info)
+                except:
+                    pass
+
             return {
                 "success": True,
-                "balance": info.get("balance", 0.0),
-                "equity": info.get("equity", 0.0),
-                "margin": info.get("margin", 0.0),
-                "free_margin": info.get("margin_free", 0.0),
-                "profit": info.get("profit", 0.0),
-                "login": info.get("login", "N/A"),
-                "trade_mode": info.get("trade_mode", "Unknown"),
-                "currency": info.get("currency", "USD"),
-                "leverage": info.get("leverage", 100),
-                "server": info.get("company", "Connected")
+                "balance": account_info.get("balance", 0.0),
+                "equity": account_info.get("equity", 0.0),
+                "margin": account_info.get("margin", 0.0),
+                "free_margin": account_info.get("margin_free", 0.0),
+                "profit": account_info.get("profit", 0.0),
+                "login": account_info.get("login", "N/A"),
+                "trade_mode": account_info.get("trade_mode", "Unknown"),
+                "currency": account_info.get("currency", "USD"),
+                "leverage": account_info.get("leverage", 100),
+                "server": account_info.get("company", "Connected")
             }
         else:
             return {
@@ -438,15 +445,15 @@ def get_real_account_info():
 def get_real_positions():
     """Get real positions from MT5"""
     try:
-        from mcp import MT5MCPClient
+        from core.mt5_direct_client import get_mt5_client
 
-        mt5_client = MT5MCPClient()
+        mt5_client = get_mt5_client()
         positions = mt5_client.positions_get()
 
-        if positions and positions.get("success", False):
+        if positions:
             return {
                 "success": True,
-                "positions": positions.get("result", [])
+                "positions": positions if isinstance(positions, list) else []
             }
         else:
             return {

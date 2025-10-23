@@ -1,0 +1,22 @@
+{
+  "agent": "BTC_Hedge_Agent",
+  "state": "analyzing",
+  "symbol": "XAUUSDc",
+  "daily_trades": 4,
+  "max_daily_trades": 20,
+  "total_profit": -6.4,
+  "winning_streak": 0,
+  "hedge_active": false,
+  "positions_count": 1,
+  "timestamp": "2025-10-23T19:12:52.259587",
+  "current_price": 4128.92,
+  "trend": "DOWN",
+  "rsi": 71.4,
+  "macd": -0.82,
+  "atr": 5.09,
+  "sma_20": 4118.05,
+  "sma_50": 4128.45,
+  "bb_upper": 4128.66,
+  "bb_middle": 4118.05,
+  "bb_lower": 4107.45
+}
