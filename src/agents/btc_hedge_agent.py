@@ -105,8 +105,21 @@ class BTCHedgeAgent:
             count=periods + 1
         )
 
+        # ATR padrão por tipo de símbolo
+        symbol_upper = self.symbol.upper()
+        if 'BTC' in symbol_upper:
+            default_atr = 150.0
+        elif 'XAU' in symbol_upper or 'GOLD' in symbol_upper:
+            default_atr = 1.0
+        elif 'JPY' in symbol_upper:
+            default_atr = 0.10
+        else:
+            # Forex padrão
+            default_atr = 0.0008
+
         if not rates or len(rates) < periods:
-            return 50  # ATR padrão se não conseguir calcular
+            logger.warning(f"⚠️ Dados insuficientes para ATR. Usando padrão: {default_atr}")
+            return default_atr
 
         # Calcular True Range
         trs = []
@@ -118,7 +131,13 @@ class BTCHedgeAgent:
             trs.append(tr)
 
         # ATR é a média dos True Ranges
-        atr = sum(trs) / len(trs)
+        atr = sum(trs) / len(trs) if trs else default_atr
+
+        # Se ATR calculado for muito pequeno ou zero, usar padrão
+        if atr < 0.0001:
+            logger.warning(f"⚠️ ATR muito pequeno ({atr:.8f}). Usando padrão: {default_atr}")
+            atr = default_atr
+
         return atr
 
     def calculate_indicators(self) -> Dict[str, float]:
@@ -259,49 +278,108 @@ class BTCHedgeAgent:
         else:
             return 'NEUTRAL'
 
+    def get_minimum_sl_distance(self, symbol_info: Dict, current_price: float) -> float:
+        """Calcula distância mínima de SL baseada nas regras do broker."""
+        # Pegar stops_level do broker (distância mínima em pontos)
+        stops_level = symbol_info.get('trade_stops_level', 0)
+        point = symbol_info.get('point', 0.00001)
+
+        # Converter stops_level para preço
+        min_distance_broker = stops_level * point
+
+        # Valores mínimos padrão por tipo de símbolo (como fallback)
+        symbol = self.symbol.upper()
+        if 'BTC' in symbol:
+            min_distance_default = 100.0  # Bitcoin
+        elif 'XAU' in symbol or 'GOLD' in symbol:
+            min_distance_default = 0.50   # Ouro
+        elif 'JPY' in symbol:
+            min_distance_default = 0.10   # Yen (cotação em 3 dígitos)
+        else:
+            # Forex padrão (EUR, GBP, etc)
+            min_distance_default = 0.0010  # 10 pips
+
+        # Usar o maior entre o mínimo do broker e o padrão
+        min_distance = max(min_distance_broker, min_distance_default)
+
+        # Garantir pelo menos 0.1% do preço como SL
+        min_percentage = current_price * 0.001
+
+        return max(min_distance, min_percentage)
+
     def open_position(self, signal: str, indicators: Dict) -> Optional[int]:
         """Abre uma posição."""
         if self.daily_trades >= self.max_daily_trades:
             logger.warning(f"⚠️ Limite diário atingido: {self.daily_trades}/{self.max_daily_trades}")
             return None
 
-        # Calcular SL e TP
-        atr = indicators.get('atr', 50)
-        current_price = indicators.get('current_price', 0)
-
-        sl_distance = atr * self.atr_multiplier
-
-        # Calcular TP baseado no target_profit
+        # Obter informações do símbolo
         symbol_info = self.mt5.get_symbol_info(self.symbol)
         if not symbol_info:
             logger.error("Não foi possível obter informações do símbolo")
             return None
 
-        tick_value = symbol_info.get('trade_tick_value', 1)
-        tick_size = symbol_info.get('trade_tick_size', 0.01)
+        # Calcular SL e TP
+        atr = indicators.get('atr', 0)
+        current_price = indicators.get('current_price', 0)
 
-        # TP em pontos para atingir $2
+        if current_price == 0:
+            logger.error("Preço atual é 0, impossível abrir posição")
+            return None
+
+        # Calcular distância do SL baseada no ATR
+        sl_distance = atr * self.atr_multiplier if atr > 0 else 0
+
+        # Garantir distância mínima de SL
+        min_sl_distance = self.get_minimum_sl_distance(symbol_info, current_price)
+        sl_distance = max(sl_distance, min_sl_distance)
+
+        logger.info(f"📏 SL Distance: ATR={atr:.5f}, Calculado={sl_distance:.5f}, Mínimo={min_sl_distance:.5f}")
+
+        tick_value = symbol_info.get('trade_tick_value', 1)
+        tick_size = symbol_info.get('trade_tick_size', 0.00001)
+
+        # TP em pontos para atingir target profit
+        if tick_value == 0 or self.volume == 0:
+            logger.error(f"Valores inválidos: tick_value={tick_value}, volume={self.volume}")
+            return None
+
         tp_points = (self.target_profit / (tick_value * self.volume)) * tick_size
+
+        # Garantir TP mínimo também
+        tp_points = max(tp_points, min_sl_distance)
 
         if signal == 'BUY':
             sl = current_price - sl_distance
             tp = current_price + tp_points
+
+            logger.info(f"🔵 Preparando COMPRA:")
+            logger.info(f"   Preço: {current_price:.5f}")
+            logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
+            logger.info(f"   TP: {tp:.5f} (distância: {tp_points:.5f})")
+
             result = self.mt5.buy_market(
                 symbol=self.symbol,
                 volume=self.volume,
                 sl=sl,
                 tp=tp,
-                comment=f"BTC_Agent_{self.daily_trades+1}"
+                comment=f"Hedge_Agent_{self.daily_trades+1}"
             )
         else:  # SELL
             sl = current_price + sl_distance
             tp = current_price - tp_points
+
+            logger.info(f"🔴 Preparando VENDA:")
+            logger.info(f"   Preço: {current_price:.5f}")
+            logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
+            logger.info(f"   TP: {tp:.5f} (distância: {tp_points:.5f})")
+
             result = self.mt5.sell_market(
                 symbol=self.symbol,
                 volume=self.volume,
                 sl=sl,
                 tp=tp,
-                comment=f"BTC_Agent_{self.daily_trades+1}"
+                comment=f"Hedge_Agent_{self.daily_trades+1}"
             )
 
         if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
