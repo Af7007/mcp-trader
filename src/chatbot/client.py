@@ -48,7 +48,7 @@ class ChatbotConfig(BaseModel):
 
     ollama_host: str = Field(default="http://localhost:8001", description="Ollama MCP server URL")
     mt5_host: str = Field(default="http://localhost:8000", description="MT5 MCP server URL")
-    chat_model: str = Field(default="qwen2.5-coder", description="Default chat model")
+    chat_model: str = Field(default="llama3.2:1b", description="Default chat model")
     conversation_timeout: int = Field(default=300, description="Conversation timeout in seconds")
     max_conversation_length: int = Field(default=50, description="Maximum conversation history length")
 
@@ -112,7 +112,7 @@ class TradingChatbot:
 
             # Use synchronous HTTP call to avoid event loop conflicts
             response = requests.post(
-                f"{server_url}/chat",
+                f"{server_url}/mcp", # Corrected endpoint for FastMCP
                 json=payload,
                 timeout=30
             )
@@ -121,6 +121,7 @@ class TradingChatbot:
                 result = response.json()
                 return result.get("result")
             else:
+                error_text = response.text
                 raise Exception(f"MCP call failed: {response.status_code} - {response.text}")
 
         except Exception as e:
@@ -325,13 +326,21 @@ Always be safe, suggest stop losses, and ask for confirmation on risky trades.""
         """Get account information"""
         try:
             account = await self._call_mt5_tool("get_account_info")
-            return {
-                "status": "success",
-                "message": f"Your account balance: ${account.balance:.2f}, Equity: ${account.equity:.2f}, Margin Free: ${account.margin_free:.2f}",
-                "account_info": account.model_dump() if hasattr(account, 'model_dump') else account
-            }
+            if account:
+                # Access attributes safely
+                balance = account.get('balance', 0)
+                equity = account.get('equity', 0)
+                margin_free = account.get('margin_free', 0)
+
+                return {
+                    "status": "success",
+                    "message": f"💰 **SALDO ATUAL:**\n• Saldo: ${balance:.2f}\n• Equity: ${equity:.2f}\n• Margem Livre: ${margin_free:.2f}",
+                    "account_info": account
+                }
+            else:
+                return {"status": "error", "message": "Não foi possível obter informações da conta"}
         except Exception as e:
-            return {"status": "error", "message": f"Could not get account info: {str(e)}"}
+            return {"status": "error", "message": f"Erro ao obter informações da conta: {str(e)}"}
 
     async def _get_positions(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         """Get open positions"""
@@ -342,9 +351,9 @@ Always be safe, suggest stop losses, and ask for confirmation on risky trades.""
 
             message = f"Open positions ({len(positions)}):\n"
             for pos in positions:
-                message += f"- {pos.symbol} {pos.type} {pos.volume} lots @ {pos.price_open}\n"
+                message += f"- {pos['symbol']} {pos['type']} {pos['volume']} lots @ {pos['price_open']}\n"
 
-            return {"status": "success", "message": message, "positions": [p.model_dump() for p in positions]}
+            return {"status": "success", "message": message, "positions": positions}
 
         except Exception as e:
             return {"status": "error", "message": f"Could not get positions: {str(e)}"}
@@ -352,25 +361,329 @@ Always be safe, suggest stop losses, and ask for confirmation on risky trades.""
     async def _get_orders(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         """Get active orders"""
         try:
-            orders = await self._call_mt5_tool("orders_get", **({"symbol": symbol} if symbol else {}))
+            orders = await self._call_mt5_tool("orders_get", **({"symbol": symbol} if symbol else {{}}))
             if not orders:
                 return {"status": "success", "message": "No active orders"}
 
             message = f"Active orders ({len(orders)}):\n"
             for order in orders:
                 message += f"- {order['ticket']}: {order['symbol']} {order['type']} {order['volume_initial']}\n"
-
+            
             return {"status": "success", "message": message, "orders": orders}
 
         except Exception as e:
             return {"status": "error", "message": f"Could not get orders: {str(e)}"}
+
+    async def process_message(self, message: str) -> Dict[str, Any]:
+        """Process user message and return response using MCP only"""
+        try:
+            message_lower = message.lower().strip()
+
+            # Check for trade confirmation first
+            if pending_trade and (message_lower in ['ok', 'sim', 'yes', 'confirmar', 'execute']):
+                return await self._execute_pending_trade()
+
+            elif pending_trade and (message_lower in ['cancelar', 'cancel', 'nao', 'no', 'abort']):
+                return await self._cancel_pending_trade()
+
+            # Clear old pending trade if user starts a new command
+            if pending_trade and (message_lower.startswith(('comprar', 'vender', 'buy', 'sell'))):
+                pending_trade = None
+
+            # Simple keyword-based detection for common commands
+            if "saldo" in message_lower or "balance" in message_lower or "conta" in message_lower:
+                result = await self._get_account_info()
+                print(f"DEBUG: Saldo result: {result}")
+                return result
+            elif "posi" in message_lower or "position" in message_lower:
+                result = await self._get_positions()
+                return result
+            elif "ordem" in message_lower or "orders" in message_lower or "pendente" in message_lower:
+                result = await self._get_orders()
+                return result
+            elif "preco" in message_lower or "price" in message_lower:
+                # Extract symbol from message
+                symbol = _extract_symbol_from_message(message)
+                if symbol:
+                    result = await self._get_symbol_price(symbol)
+                    return result
+                else:
+                    return {"status": "error", "message": "Especifique um símbolo para ver o preço"}
+            elif "teste" in message_lower or "ping" in message_lower:
+                result = await self._test_connection()
+                return result
+            elif "fechar" in message_lower and "tudo" in message_lower:
+                result = await self._close_all_positions()
+                return result
+            elif "fechar" in message_lower:
+                return {"status": "error", "message": "Especifique qual posição fechar ou use 'fechar tudo'"}
+
+            # Parse trading intent using Ollama for complex commands
+            intent = await self._parse_trading_intent(message)
+
+            if intent.intent == "trade" and intent.action in ["buy", "sell"]:
+                return await self._prepare_trade_order(intent)
+            elif intent.intent == "analysis":
+                return await self._analyze_market(intent)
+
+            # Fallback response
+            return {
+                "status": "unknown",
+                "message": f"🤖 **Comando não reconhecido:** '{message}'\n\n💡 **Comandos disponíveis:**\n• Saldo: 'quanto tenho de saldo?', 'ver saldo'\n• Posições: 'minhas posições', 'posições abertas'\n• Ordens: 'ordens ativas', 'ordens pendentes'\n• Preço: 'preço EURUSD', 'cotação BTCUSD'\n• Trading: 'comprar 0.1 EURUSD', 'vender 0.01 XAUUSD'\n• Análise: 'analisar EURUSD', 'como está o mercado'\n• Fechar: 'fechar tudo', 'fechar posição 123'",
+                "intent": intent.model_dump() if hasattr(intent, 'model_dump') else intent.__dict__
+            }
+
+        except Exception as e:
+            return {"status": "error", "message": f"[ERRO SISTEMA]: {str(e)}"}
+
+    async def chat(self, message: str) -> Dict[str, Any]:
+        """Process a chat message."""
+        return await self.process_message(message)
+
+    async def _execute_pending_trade(self) -> Dict[str, Any]:
+        """Execute pending trade through MCP"""
+        global pending_trade
+
+        if not pending_trade:
+            return {"status": "error", "message": "[ERRO] Nenhuma operacao pendente"}
+
+        try:
+            symbol = pending_trade['symbol']
+            volume = pending_trade['volume']
+            tp_price = pending_trade.get('tp_price')
+            sl_price = pending_trade.get('sl_price')
+            action = pending_trade['action']
+
+            if action.upper() == 'BUY':
+                result = await self._call_mt5_tool(
+                    "buy_market",
+                    symbol=symbol,
+                    volume=volume,
+                    sl=sl_price,
+                    tp=tp_price,
+                    comment="Chatbot MCP trade"
+                )
+            elif action.upper() == 'SELL':
+                result = await self._call_mt5_tool(
+                    "sell_market",
+                    symbol=symbol,
+                    volume=volume,
+                    sl=sl_price,
+                    tp=tp_price,
+                    comment="Chatbot MCP trade"
+                )
+            else:
+                return {"status": "error", "message": "[ERRO] Acao invalida"}
+
+            if result and result['retcode'] == 10009:  # TRADE_RETCODE_DONE
+                msg = f"[OPERACAO EXECUTADA] {action.upper()} {symbol} {volume} lots Ticket: {result['order']}"
+                pending_trade = None
+                return {"status": "success", "message": msg}
+            else:
+                error_msg = f"[FALHA EXECUCAO] {result['comment'] if result else 'Erro desconhecido'}"
+                pending_trade = None
+                return {"status": "error", "message": error_msg}
+
+        except Exception as e:
+            pending_trade = None
+            return {"status": "error", "message": f"[ERRO EXECUCAO]: {str(e)}"}
+
+    async def _cancel_pending_trade(self) -> Dict[str, Any]:
+        """Cancel pending trade"""
+        global pending_trade
+
+        if not pending_trade:
+            return {"status": "error", "message": "[ERRO] Nenhuma operacao pendente"}
+
+        symbol = pending_trade['symbol']
+        action = pending_trade['action']
+        pending_trade = None
+
+        return {
+            "status": "cancelled",
+            "message": f"[OPERACAO CANCELADA] {action.upper()} {symbol} - Abortada pelo usuario"
+        }
+
+    async def _prepare_trade_order(self, intent: ParsedTradingIntent) -> Dict[str, Any]:
+        """Prepare trade order for confirmation"""
+        global pending_trade
+
+        symbol = intent.symbol
+        volume = intent.volume
+        action = intent.action.upper() if intent.action else ""
+
+        if not symbol or not volume or not action:
+            return {"status": "error", "message": "[ERRO] Parametros insuficientes para trade"}
+
+        try:
+            # CHECK AND CLOSE EXISTING POSITIONS BEFORE OPENING NEW ONES
+            await self._close_all_existing_positions(symbol)
+
+            # Get current price and symbol info through MCP
+            if action == "BUY":
+                tick_data = await self._call_mt5_tool("get_symbol_info_tick", symbol=symbol)
+                current_price = tick_data['ask'] if tick_data else 0
+            else:
+                tick_data = await self._call_mt5_tool("get_symbol_info_tick", symbol=symbol)
+                current_price = tick_data['bid'] if tick_data else 0
+
+            symbol_info = await self._call_mt5_tool("get_symbol_info", symbol=symbol)
+            contract_size = symbol_info['trade_contract_size'] if symbol_info and symbol_info['trade_contract_size'] > 0 else 1.0
+
+            # Convert TP/SL dollar values to price levels
+            tp_price = intent.take_profit
+            sl_price = intent.stop_loss
+
+            if intent.take_profit and tp_price < 10:  # Assume dollar value if small number
+                if action == "BUY":
+                    tp_price = current_price + (intent.take_profit / (volume * contract_size))
+                else:  # SELL
+                    tp_price = current_price - (intent.take_profit / (volume * contract_size))
+
+            if intent.stop_loss and sl_price < 10:  # Assume dollar value if small number
+                if action == "BUY":
+                    sl_price = current_price - (intent.stop_loss / (volume * contract_size))
+                else:  # SELL
+                    sl_price = current_price + (intent.stop_loss / (volume * contract_size))
+
+            pending_trade = {
+                'symbol': symbol,
+                'volume': volume,
+                'tp_price': tp_price,
+                'sl_price': sl_price,
+                'action': action
+            }
+
+            msg = f"[PREPARANDO {action}] {symbol} {volume} lots @ ${current_price:.5f}\n"
+            if sl_price:
+                msg += f"Stop Loss: ${sl_price:.5f}\n"
+            if tp_price:
+                msg += f"Take Profit: ${tp_price:.5f}\n"
+            msg += "\n[CONFIRMACAO] Envie 'ok' para executar ou 'cancelar' para abortar"
+
+            return {"status": "pending_confirmation", "message": msg}
+
+        except Exception as e:
+            return {"status": "error", "message": f"[ERRO PREPARACAO]: {str(e)}"}
+
+    async def _close_all_existing_positions(self, new_symbol: str) -> None:
+        """Close all existing positions before opening new ones"""
+        try:
+            # Get all open positions
+            positions = await self._call_mt5_tool("positions_get")
+
+            if positions and len(positions) > 0:
+                print(f"[AUTO CLOSE] Fechando {len(positions)} posicoes existentes antes de abrir nova operacao")
+
+                # Close all positions one by one
+                for position in positions:
+                    try:
+                        # Extract ticket using safe attribute access
+                        ticket = position['ticket']
+                        if ticket:
+                            close_result = await self._call_mt5_tool(
+                                "close_position",
+                                ticket=ticket,
+                                comment="[AUTO CLOSE] Nova operacao sendo aberta"
+                            )
+                            if close_result and close_result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+                                print(f"[AUTO CLOSE] Posicao {ticket} fechada com sucesso")
+                            else:
+                                print(f"[AUTO CLOSE] Falha ao fechar posicao {ticket}: {close_result}")
+                        else:
+                            print(f"[AUTO CLOSE] Ticket nao encontrado para posicao: {position}")
+                    except Exception as e:
+                        print(f"[AUTO CLOSE] Erro ao fechar posicao: {e}")
+                        continue
+
+                print(f"[AUTO CLOSE] Processo de fechamento concluido")
+            else:
+                print("[AUTO CLOSE] Nenhuma posicao aberta para fechar")
+
+        except Exception as e:
+            print(f"[AUTO CLOSE] Erro ao verificar/fechar posicoes: {e}")
+
+    async def _test_connection(self) -> Dict[str, Any]:
+        """Test MCP connection to MT5"""
+        try:
+            health = await self._call_mt5_tool("health")
+            if health and health.get('status') == 'ok':
+                return {"status": "success", "message": "[CONEXAO OK] MCP MT5 respondendo"}
+            else:
+                return {"status": "error", "message": "[CONEXAO FALHANDO] MCP MT5 nao responde"}
+        except Exception as e:
+            return {"status": "error", "message": f"[ERRO CONEXAO]: {str(e)}"}
+
+    async def _get_symbol_price(self, symbol: str) -> Dict[str, Any]:
+        """Get symbol price information"""
+        try:
+            tick = await self._call_mt5_tool("get_symbol_info_tick", symbol=symbol)
+            if tick:
+                bid = tick['bid'] if tick else 0
+                ask = tick['ask'] if tick else 0
+                return {
+                    "status": "success",
+                    "message": f"💰 **{symbol}**:\n• Bid: ${bid:.5f}\n• Ask: ${ask:.5f}\n• Spread: {abs(ask - bid):.5f}",
+                    "price_info": {"symbol": symbol, "bid": bid, "ask": ask}
+                }
+            else:
+                return {"status": "error", "message": f"Não foi possível obter preço para {symbol}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Erro ao obter preço: {str(e)}"}
+
+    async def _close_all_positions(self) -> Dict[str, Any]:
+        """Close all open positions"""
+        try:
+            positions = await self._call_mt5_tool("positions_get")
+            if not positions:
+                return {"status": "success", "message": "Nenhuma posição aberta para fechar"}
+
+            closed_count = 0
+            for position in positions:
+                try:
+                    ticket = position['ticket']
+                    if ticket:
+                        result = await self._call_mt5_tool("close_position", ticket=ticket)
+                        if result and result.get('retcode') == 10009:
+                            closed_count += 1
+                except Exception as e:
+                    print(f"Erro ao fechar posição {ticket}: {e}")
+                    continue
+
+            return {
+                "status": "success",
+                "message": f"✅ Fechadas {closed_count} posições"
+            }
+        except Exception as e:
+            return {"status": "error", "message": f"Erro ao fechar posições: {str(e)}"}
+
+    async def _analyze_market(self, intent: ParsedTradingIntent) -> Dict[str, Any]:
+        """Analyze market based on intent"""
+        try:
+            symbol = intent.symbol
+            if symbol:
+                # Get symbol information
+                tick = await self._call_mt5_tool("get_symbol_info_tick", symbol=symbol)
+                if tick:
+                    bid = tick['bid'] if tick else 0
+                    ask = tick['ask'] if tick else 0
+                    return {
+                        "status": "success",
+                        "message": f"📊 **Análise de {symbol}:**\n• Preço atual: ${ask:.5f}\n• Bid: ${bid:.5f}\n• Spread: {abs(ask - bid):.5f}"
+                    }
+                else:
+                    return {"status": "error", "message": f"Não foi possível obter dados para {symbol}"}
+            else:
+                return {"status": "error", "message": "Especifique um símbolo para análise"}
+        except Exception as e:
+            return {"status": "error", "message": f"Erro na análise: {str(e)}"}
 
 
 def _extract_symbol_from_message(message: str) -> str:
     """Extract trading symbol from message (improved parsing)"""
     import re
 
-    # Find symbol in the exact case it appears
+    # Find symbol in the exact case it appears, added XAUUSDc explicitly
     symbol_patterns = [
         r'\bBTCUSDC\b',  # BTCUSDc (exactly as needed)
         r'\b(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD|EURGBP|EURJPY|XAUUSD|XAUEUR|BTCUSD|ETHUSD)[a-zA-Z]*\b'
@@ -436,7 +749,7 @@ def _extract_volume_from_message(message: str) -> float:
     return 0.01
 
 
-def _extract_tp_sl_from_message(message: str):
+def _extract_tp_sl_from_message(message: str): # Now returns (tp_value, sl_value, tp_unit, sl_unit)
     """Extract take profit and stop loss from message in pips"""
     import re
 
@@ -444,32 +757,43 @@ def _extract_tp_sl_from_message(message: str):
     sl = None
 
     # Look for TP patterns
+    tp_value = None
+    sl_value = None
+    tp_unit = "none"
+    sl_unit = "none"
+
+    # Look for TP patterns (prioritize dollar values)
     tp_patterns = [
-        r'tp\s+de\s+(\d+)',  # "tp de 500"
-        r'take\s+profit\s*[:=]?\s*(\d+)',  # "take profit: 500"
-        r'tp\s*[:=]?\s*(\d+)',  # "tp=500"
+        (r'tp\s+\$(\d+\.?\d*)', "dollars"),  # "TP $1" or "TP $1.50"
+        (r'tp\s+de\s+\$(\d+\.?\d*)', "dollars"),  # "tp de $1"
+        (r'take\s+profit\s*[:=]?\s*\$(\d+\.?\d*)', "dollars"),  # "take profit: $1"
+        (r'tp\s*[:=]?\s*(\d+\.?\d*)', "pips"),  # "tp=500" (default to pips if no $)
+        (r'take\s+profit\s*[:=]?\s*(\d+\.?\d*)', "pips"),
     ]
 
-    for pattern in tp_patterns:
+    for pattern, unit in tp_patterns:
         match = re.search(pattern, message, re.IGNORECASE)
         if match:
-            tp = int(match.group(1))
+            tp_value = float(match.group(1))
+            tp_unit = unit
             break
 
-    # Look for SL patterns
+    # Look for SL patterns (prioritize dollar values)
     sl_patterns = [
-        r'sl\s+de\s+(\d+)',  # "sl de 1500"
-        r'stop\s+loss\s*[:=]?\s*(\d+)',  # "stop loss: 1500"
-        r'sl\s*[:=]?\s*(\d+)',  # "sl=1500"
+        (r'sl\s+de\s+\$(\d+\.?\d*)', "dollars"),  # "sl de $1"
+        (r'stop\s+loss\s*[:=]?\s*\$(\d+\.?\d*)', "dollars"),  # "stop loss: $1"
+        (r'sl\s*[:=]?\s*(\d+\.?\d*)', "pips"),  # "sl=1500" (default to pips if no $)
+        (r'stop\s+loss\s*[:=]?\s*(\d+\.?\d*)', "pips"),
     ]
 
-    for pattern in sl_patterns:
+    for pattern, unit in sl_patterns:
         match = re.search(pattern, message, re.IGNORECASE)
         if match:
-            sl = int(match.group(1))
+            sl_value = float(match.group(1))
+            sl_unit = unit
             break
 
-    return tp, sl
+    return tp_value, sl_value, tp_unit, sl_unit
 
 
 # Global chatbot instance
@@ -495,314 +819,13 @@ async def initialize_chatbot() -> Dict[str, Any]:
 # Global state for pending trades
 pending_trade = None
 
-def send_message_sync(message: str) -> Dict[str, Any]:
-    """Send message to chatbot and get response with REAL MT5 data"""
-    global pending_trade
-
-    try:
-        import MetaTrader5 as mt5
-
-        # Try to initialize MT5 connection
-        if not mt5.initialize():
-            return {
-                "response": "❌ MT5 não conectado. Certifique-se que o MetaTrader 5 está rodando.",
-                "intent": {"intent": "error", "confidence": 1.0},
-                "result": {"status": "error", "message": "MT5 not initialized"},
-                "timestamp": datetime.now().isoformat()
-            }
-
-        message_lower = message.lower().strip()
-
-        # Check for trade confirmation first
-        if pending_trade and (message_lower in ['ok', 'sim', 'yes', 'confirmar', 'execute']):
-            # Execute the pending trade
-            symbol = pending_trade['symbol']
-            volume = pending_trade['volume']
-            tp_price = pending_trade.get('tp_price')
-            sl_price = pending_trade.get('sl_price')
-            action = pending_trade['action']
-
-            try:
-                if action.upper() == 'BUY':
-                    request = {
-                        "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": symbol,
-                        "volume": volume,
-                        "type": mt5.ORDER_TYPE_BUY,
-                        "price": mt5.symbol_info_tick(symbol).ask,
-                        "sl": sl_price,
-                        "tp": tp_price,
-                        "deviation": 10,
-                        "magic": 234000,
-                        "comment": "Chatbot trade",
-                        "type_time": mt5.ORDER_TIME_GTC,
-                        "type_filling": mt5.ORDER_FILLING_IOC,
-                    }
-
-                    result = mt5.order_send(request)
-                    if result.retcode == mt5.TRADE_RETCODE_DONE:
-                        response = f"✅ **ORDEM EXECUTADA COM SUCESSO!**\n\n"
-                        response += f"📈 **{action.upper()}** {symbol} {volume} lots\n"
-                        response += f"🎯 Ticket: {result.order}\n"
-                        response += f"💰 Preço: ${result.price:.5f}\n"
-                        if sl_price:
-                            response += f"🛡️ Stop Loss: ${sl_price:.5f}\n"
-                        if tp_price:
-                            response += f"📈 Take Profit: ${tp_price:.5f}\n"
-                        pending_trade = None
-                    else:
-                        response = f"❌ **FALHA NA EXECUÇÃO:** {result.comment}"
-                        pending_trade = None
-
-                elif action.upper() == 'SELL':
-                    request = {
-                        "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": symbol,
-                        "volume": volume,
-                        "type": mt5.ORDER_TYPE_SELL,
-                        "price": mt5.symbol_info_tick(symbol).bid,
-                        "sl": sl_price,
-                        "tp": tp_price,
-                        "deviation": 10,
-                        "magic": 234000,
-                        "comment": "Chatbot trade",
-                        "type_time": mt5.ORDER_TIME_GTC,
-                        "type_filling": mt5.ORDER_FILLING_IOC,
-                    }
-
-                    result = mt5.order_send(request)
-                    if result.retcode == mt5.TRADE_RETCODE_DONE:
-                        response = f"✅ **ORDEM EXECUTADA COM SUCESSO!**\n\n"
-                        response += f"📉 **{action.upper()}** {symbol} {volume} lots\n"
-                        response += f"🎯 Ticket: {result.order}\n"
-                        response += f"💰 Preço: ${result.price:.5f}\n"
-                        if sl_price:
-                            response += f"🛡️ Stop Loss: ${sl_price:.5f}\n"
-                        if tp_price:
-                            response += f"📈 Take Profit: ${tp_price:.5f}\n"
-                        pending_trade = None
-                    else:
-                        response = f"❌ **FALHA NA EXECUÇÃO:** {result.comment}"
-                        pending_trade = None
-                else:
-                    response = "❌ **ERRO:** Ação de trade pendente inválida"
-                    pending_trade = None
-
-            except Exception as e:
-                response = f"❌ **ERRO NA EXECUÇÃO:** {str(e)}"
-                pending_trade = None
-
-            return {
-                "response": response,
-                "intent": {"intent": "trade_confirmation", "confidence": 1.0},
-                "result": {"status": "success", "message": response},
-                "timestamp": datetime.now().isoformat()
-            }
-
-        elif pending_trade and (message_lower in ['cancelar', 'cancel', 'não', 'no', 'abort']):
-            # Cancel the pending trade
-            symbol = pending_trade['symbol']
-            action = pending_trade['action']
-            response = f"❌ **ORDEM CANCELADA:**\n\n"
-            response += f"📊 {action.upper()} {symbol} - Operação abortada pelo usuário"
-            pending_trade = None
-
-            return {
-                "response": response,
-                "intent": {"intent": "trade_cancellation", "confidence": 1.0},
-                "result": {"status": "success", "message": response},
-                "timestamp": datetime.now().isoformat()
-            }
-
-        # Clear old pending trade if user starts a new command
-        if pending_trade and (message_lower.startswith(('comprar', 'vender', 'buy', 'sell'))):
-            pending_trade = None
-
-        # PROCESS REAL TRADING DATA
-        if "saldo" in message_lower or "account" in message_lower or "balance" in message_lower:
-            # Get real account info
-            account_info = mt5.account_info()
-            if account_info:
-                balance = account_info.balance
-                equity = account_info.equity
-                margin_free = account_info.margin_free
-                response = f"Saldo atual: ${balance:.2f} | Equity: ${equity:.2f} | Margem livre: ${margin_free:.2f}"
-            else:
-                response = "❌ Não foi possível obter informações da conta. Verifique se você está logado no MT5."
-
-        elif "posi" in message_lower or "position" in message_lower or "positions" in message_lower:
-            # Get real positions
-            positions = mt5.positions_get()
-            if positions:
-                response = f"📊 Você tem {len(positions)} posições abertas:\n\n"
-                for pos in positions:
-                    direction = "🟢 COMPRA" if pos.type == mt5.POSITION_TYPE_BUY else "🔴 VENDA"
-                    profit_color = "🟢" if pos.profit > 0 else "🔴"
-                    response += f"{pos.symbol}: {direction} | Volume: {pos.volume} | Preço: ${pos.price_open:.4f} | Profit: {profit_color}${pos.profit:.2f}\n"
-            else:
-                response = "📊 Você não tem posições abertas atualmente."
-
-        elif "comprar" in message_lower or "buy" in message_lower:
-            # Extract symbol, volume, TP and SL from message
-            symbol = _extract_symbol_from_message(message)
-            volume = _extract_volume_from_message(message)
-            tp_pips, sl_pips = _extract_tp_sl_from_message(message)
-
-            if symbol and volume:
-                # Check symbol availability
-                symbol_info = mt5.symbol_info(symbol)
-                if not symbol_info:
-                    # Símbolo não encontrado, sugerir símbolos disponíveis
-                    all_symbols = mt5.symbols_get()
-                    available_forex = [s.name for s in all_symbols[:50] if not any(x in s.name for x in ['INDEX', 'CFD'])][:10]  # Limit to avoid spam
-                    response = f"⚠️ Símbolo '{symbol}' não disponível neste broker.\n\n"
-                    response += f"📊 Símbolos disponíveis (exemplos):\n" + "\n".join(f"• {s}" for s in available_forex)
-                    response += f"\n\nExemplo: 'comprar 0.1 {available_forex[0]} tp 100 sl 50'"
-                else:
-                    # Get current price for buy (ask)
-                    tick = mt5.symbol_info_tick(symbol)
-                    if tick:
-                        price = tick.ask
-                        # Calculate TP and SL prices if provided - SPECIAL HANDLING FOR CRYPTO
-                        tp_price = None
-                        sl_price = None
-
-                        # Check if this is a crypto symbol (like BTCUSDc)
-                        if symbol.upper().endswith('C') or any(x in symbol.upper() for x in ['BTC', 'ETH']):
-                            # CRYPTO: stops in direct price points, not pip conversion
-                            # Use much smaller pip values (1 pip = 1 dollar for crypto trading)
-                            crypto_multiplier = 1.0 if 'BTC' in symbol.upper() else 0.1  # BTC uses larger values
-                            if tp_pips:
-                                tp_price = price + (tp_pips * crypto_multiplier)
-                            if sl_pips:
-                                sl_price = price - (sl_pips * crypto_multiplier)
-                        else:
-                            # NORMAL FOREX: convert pips to price points
-                            if tp_pips:
-                                tp_price = price + (tp_pips * symbol_info.point)
-                            if sl_pips:
-                                sl_price = price - (sl_pips * symbol_info.point)
-
-                        # Place buy order with 0.01 lots for demo safety
-                        safe_volume = min(volume, 0.01) if volume < 0.01 else volume
-
-                        response = f"✅ **PREPARANDO COMPRA:**\n"
-                        response += f"Símbolo: {symbol}\n"
-                        response += f"Volume: {safe_volume:.2f} lots\n"
-                        response += f"Preço atual: ${price:.5f}\n"
-
-                        if tp_price:
-                            response += f"📈 Take Profit: ${tp_price:.5f} (+{tp_pips} pips)\n"
-                        if sl_price:
-                            response += f"🛡️ Stop Loss: ${sl_price:.5f} (-{sl_pips} pips)\n"
-
-                        # ATIVAR TRADE PENDENTE PARA CONFIRMAÇÃO
-                        pending_trade = {
-                            'symbol': symbol,
-                            'volume': safe_volume,
-                            'tp_price': tp_price,
-                            'sl_price': sl_price,
-                            'action': 'BUY'
-                        }
-
-                        response += f"\n**CONFIRMAR?** Envie 'ok' para executar ou 'cancelar' para abortar."
-                    else:
-                        response = f"❌ Não foi possível obter preço atual para {symbol}."
-            else:
-                response = "❌ Para comprar, especifique o símbolo e volume. Exemplo: 'comprar 100 EURUSD'"
-
-        elif "vender" in message_lower or "sell" in message_lower:
-            # Extract symbol and volume
-            symbol = _extract_symbol_from_message(message)
-            volume = _extract_volume_from_message(message)
-
-            if symbol and volume:
-                symbol_info = mt5.symbol_info(symbol)
-                if not symbol_info:
-                    # Símbolo não encontrado, sugerir símbolos disponíveis
-                    all_symbols = mt5.symbols_get()
-                    available_forex = [s.name for s in all_symbols[:50] if not any(x in s.name for x in ['INDEX', 'CFD', 'COMMODITIES']) and len(s.name) >= 6][:8]  # Only sizable names
-                    available_crypto = [s.name for s in all_symbols if 'BTC' in s.name or 'ETH' in s.name][:3]
-
-                    response = f"⚠️ Símbolo '{symbol}' não encontrado ou indisponível no seu broker MT5.\n\n"
-                    response += f"📊 Símbolos FOREX disponíveis:\n"
-                    for s in available_forex:
-                        response += f"• {s}\n"
-                    response += f"\n📊 Símbolos CRYPTO disponíveis:\n"
-                    for s in available_crypto:
-                        response += f"• {s}\n"
-                    response += f"\n💡 **DICAS:**\n• Use 'teste' para verificar conexão\n• Use símbolos listados acima\n• Exemplo: 'comprar 0.1 {available_forex[0] if available_forex else 'EURUSD'} tp 100 sl 50'"
-                    response += f"\n🛡️ **SEGURANÇA:**{safe_volume:.2f} lots limite de segurança ativo."
-                else:
-                    tick = mt5.symbol_info_tick(symbol)
-                    if tick:
-                        price = tick.bid
-                        safe_volume = min(volume, 0.01) if volume < 0.01 else volume
-
-                        response = f"📉 **EXECUTANDO VENDA:**\n"
-                        response += f"Símbolo: {symbol}\n"
-                        response += f"Volume: {safe_volume} lots\n"
-                        response += f"Preço: ${price:.5f}\n"
-                        response += f"\n**CONFIRMAR?** Envie 'ok' para executar ou qualquer outra coisa para cancelar."
-                    else:
-                        response = f"❌ Não foi possível obter preço atual para {symbol}."
-            else:
-                response = "❌ Para vender, especifique o símbolo e volume. Exemplo: 'vender 50 GBPUSD'"
-
-        elif "analis" in message_lower or "analysis" in message_lower or "mercado" in message_lower:
-            response = "📊 **ANÁLISE DE MERCADO:**\n\n"
-            response += "⚡ **Principais Índices:**\n"
-            response += "  • Market volatility: Média\n"
-            response += "  • Tendência dominante: Lateral \n"
-            response += "  • Recomendação: Monitorar para entrada\n\n"
-            response += "💡 **Sugestão:** Use indicadores técnicos para confirmar entradas."
-
-        elif "ordem" in message_lower or "orders" in message_lower:
-            orders = mt5.orders_get()
-            if orders:
-                response = f"📋 Você tem {len(orders)} ordens pendentes:\n\n"
-                for order in orders:
-                    order_type = "Compra Limit" if order.type == mt5.ORDER_TYPE_BUY_LIMIT else ("Compra Stop" if order.type == mt5.ORDER_TYPE_BUY_STOP else ("Venda Limit" if order.type == mt5.ORDER_TYPE_SELL_LIMIT else "Venda Stop"))
-                    response += f"{order.symbol}: {order_type} | Volume: {order.volume_initial} | Preço: ${order.price_open:.5f}\n"
-            else:
-                response = "📋 Você não tem ordens pendentes."
-
-        elif "ping" in message_lower or "teste" in message_lower or "test" in message_lower:
-            # Quick MT5 ping test
-            if mt5.terminal_info():
-                response = "✅ **CONEXÃO MT5 OK:** Terminal respondendo normalmente."
-            else:
-                response = "❌ **CONEXÃO MT5 FALHANDO:** Terminal não está respondendo."
-
-        else:
-            response = f"💬 **{message}**\n\n"
-            response += "**Comandos disponíveis:**\n"
-            response += "• 'saldo' ou 'balance' - Ver informações da conta\n"
-            response += "• 'posições' ou 'positions' - Ver posições abertas\n"
-            response += "• 'comprar 100 EURUSD' - Ordem de compra\n"
-            response += "• 'vender 50 GBPUSD' - Ordem de venda\n"
-            response += "• 'ordens' ou 'orders' - Ver ordens pendentes\n"
-            response += "• 'análise' ou 'analysis' - Análise de mercado\n"
-            response += "• 'teste' ou 'test' - Verificar conexão MT5"
-
-        return {
-            "response": response,
-            "intent": {"intent": "trading_command", "confidence": 1.0},
-            "result": {"status": "success", "message": response},
-            "timestamp": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"MT5 connection failed: {e}")
-        return {
-            "response": f"❌ Erro ao conectar com MT5: {str(e)}\n\nCertifique-se que:\n• MetaTrader 5 está instalado\n• MetaTrader 5 está rodando\n• Você está logado nesta conta\n• Conexão com Broker está ativa",
-            "intent": {"intent": "error", "confidence": 1.0},
-            "result": {"status": "error", "message": str(e)},
-            "timestamp": datetime.now().isoformat()
-        }
-
-
 async def send_message(message: str) -> Dict[str, Any]:
+    """Send message to chatbot using MCP protocol for MT5 communication"""
+    bot = await get_chatbot()
+    return await bot.chat(message)
+
+
+async def send_message_old(message: str) -> Dict[str, Any]: # This function is called by the web interface
     """Send message to chatbot and get response"""
     bot = await get_chatbot()
     return await bot.chat(message)
@@ -814,224 +837,11 @@ async def confirm_trading_command(command: str, params: Dict[str, Any]) -> Dict[
     return await bot.confirm_command(command, params)
 
 
-async def send_message_async(message: str) -> Dict[str, Any]:
-    """Send message using Ollama AI intelligent interpretation - FULL AI MODE"""
 
-    global pending_trade
 
-    try:
-        import MetaTrader5 as mt5
 
-        # Ensure MT5 connection
-        if not mt5.initialize():
-            return {
-                "response": "❌ MT5 não conectado. Certifique-se que o MetaTrader 5 está rodando.",
-                "intent": {"intent": "error", "confidence": 1.0},
-                "result": {"status": "error", "message": "MT5 not initialized"},
-                "timestamp": datetime.now().isoformat()
-            }
-
-        # STEP 1: AI ANALYSIS - Use Ollama to analyze user intent
-        async with OllamaClient() as ollama:
-            # Analyze intent using Ollama
-            analysis_result = await ollama._request("POST", "/api/chat", json={
-                "model": "qwen2.5-coder",
-                "messages": [{
-                    "role": "system",
-                    "content": """You are an expert trading analyst AI. Analyze user messages for trading intent.
-Return JSON with: intent, action, symbol, volume, price, stop_loss, take_profit, timeframe, confidence, parsed_command"""
-                }, {
-                    "role": "user",
-                    "content": f"Analyze this trading message: '{message}'"
-                }],
-                "stream": False
-            })
-
-            analysis_data = analysis_result.get("message", {}).get("content", "{}")
-            try:
-                intent_data = json.loads(analysis_data)
-                intent = ParsedTradingIntent(**intent_data)
-            except Exception as e:
-                # Fallback if JSON parsing fails
-                intent = ParsedTradingIntent(
-                    intent="chat",
-                    confidence=0.8,
-                    parsed_command=message
-                )
-
-        response_parts = []
-        response_parts.append(f"🧠 **ANÁLISE IA:** {intent.parsed_command}")
-
-        # STEP 2: AI DECISION MAKING
-        if intent.intent == "trade" and intent.action in ["buy", "sell"]:
-            # TRADING DECISION
-            symbol = intent.symbol
-            volume = intent.volume
-
-            if symbol and volume:
-                # Get market data first for AI analysis
-                symbol_info = mt5.symbol_info(symbol)
-                if symbol_info:
-                    tick = mt5.symbol_info_tick(symbol)
-                    account_info = mt5.account_info()
-
-                    if tick:
-                        price = tick.ask if intent.action == "buy" else tick.bid
-                        balance = account_info.balance if account_info else 0
-
-                        # AI RISK ANALYSIS
-                        risk_analysis = f"""
-💡 **ANÁLISE DE RISCO IA:**
-• Ativo: {symbol} @ ${price:.5f}
-• Volume: {volume} lots
-• Exposição: ${(volume * price * symbol_info.margin_initial):.2f}
-• Saldo disponível: ${balance:.2f}
-• Margem necessária: {((volume * price * symbol_info.margin_initial) / balance * 100):.1f}%
-"""
-
-                        # AI STRATEGY SUGESTIONS
-                        suggestions = []
-                        if intent.action == "buy":
-                            if volume > 0.5:
-                                suggestions.append("⚠️ Volume alto - considere reduzir para 0.5 lots")
-                            if tick.ask > symbol_info.session_high:
-                                suggestions.append("📈 Preço próximo da máxima da sessão")
-                        elif intent.action == "sell":
-                            if volume > 0.5:
-                                suggestions.append("⚠️ Volume alto - considere reduzir para 0.5 lots")
-                            if tick.bid < symbol_info.session_low:
-                                suggestions.append("📉 Preço próximo da mínima da sessão")
-
-                        response_parts.append(risk_analysis.strip())
-
-                        if suggestions:
-                            response_parts.append("**💭 SOLICITAÇÕES DO IA:**\n" + "\n".join(f"• {s}" for s in suggestions))
-
-                        # DECISION: Execute or confirm?
-                        high_risk = volume > 1.0 or any(word in intent.parsed_command.lower() for word in ["urgente", "agora", "imediato"])
-                        if high_risk:
-                            response_parts.append("\n**🤔 IA RECOMENDA VERIFICAÇÃO:** Operação de alto risco detectada")
-                            response_parts.append("**CONFIRMAR?** Envie 'ok' para executar ou 'cancelar' para abortar.")
-                        else:
-                            response_parts.append("**🤖 IA EXECUTANDO:** Ordem será executada automaticamente.")
-
-                        # Set pending trade for confirmation
-                        pending_trade = {
-                            'symbol': symbol,
-                            'volume': min(volume, 0.5),  # Safety limit
-                            'tp_price': intent.take_profit,
-                            'sl_price': intent.stop_loss,
-                            'action': intent.action.upper()
-                        }
-
-                        # If low risk, auto-execute
-                        if not high_risk:
-                            pending_trade = None  # Clear pending
-                            # Execute immediately
-                            try:
-                                trade_request = {
-                                    "action": mt5.TRADE_ACTION_DEAL,
-                                    "symbol": symbol,
-                                    "volume": min(volume, 0.5),
-                                    "type": mt5.ORDER_TYPE_BUY if intent.action == "buy" else mt5.ORDER_TYPE_SELL,
-                                    "price": price,
-                                    "sl": intent.stop_loss,
-                                    "tp": intent.take_profit,
-                                    "deviation": 10,
-                                    "magic": 234000,
-                                    "comment": "AI Trading Bot",
-                                    "type_time": mt5.ORDER_TIME_GTC,
-                                    "type_filling": mt5.ORDER_FILLING_IOC,
-                                }
-
-                                result = mt5.order_send(trade_request)
-                                if result.retcode == mt5.TRADE_RETCODE_DONE:
-                                    response_parts.append(f"\n✅ **ORDEM EXECUTADA COM SUCESSO!**")
-                                    response_parts.append(f"🎯 Ticket: {result.order}")
-                                    response_parts.append(f"💰 Preço: ${result.price:.5f}")
-                                else:
-                                    response_parts.append(f"\n❌ **EXECUÇÃO FALHOU:** {result.comment}")
-                            except Exception as e:
-                                response_parts.append(f"\n❌ **ERRO DE EXECUÇÃO:** {str(e)}")
-
-                else:
-                    response_parts.append("❌ Ativo não encontrado ou indisponível.")
-            else:
-                response_parts.append("❌ Parâmetros insuficientes para operação de trading.")
-
-        elif intent.intent == "info" or intent.intent == "analysis":
-            # INFORMATION/MARKET ANALYSIS REQUEST
-            response_parts.append("📊 **ANÁLISE DE MERCADO IA:**")
-
-            # Get market data for analysis
-            if intent.symbol:
-                symbol = intent.symbol
-                symbol_info = mt5.symbol_info(symbol)
-                if symbol_info:
-                    tick = mt5.symbol_info_tick(symbol)
-                    if tick:
-                        current_price = tick.last if tick.last > 0 else tick.ask
-                        response_parts.append(f"🎯 **{symbol}** Atual: ${current_price:.5f}")
-
-                        # Simple technical analysis placeholder
-                        response_parts.append(f"📈 Max Sessão: ${symbol_info.session_high:.5f}")
-                        response_parts.append(f"📉 Min Sessão: ${symbol_info.session_low:.5f}")
-
-                        if intent.timeframe:
-                            response_parts.append(f"🕐 Timeframe solicitado: {intent.timeframe}")
-                        else:
-                            response_parts.append("💡 Use timeframes: M1, M5, H1, D1, W1")
-
-            else:
-                # General market information
-                response_parts.append("🌍 **MERCADO GERAL:**")
-                response_parts.append("- Forex: EURUSD, GBPUSD, USDJPY")
-                response_parts.append("- Crypto: BTCUSD, ETHUSD")
-                response_parts.append("- Índices: SPX500, UK100")
-                response_parts.append("\n💡 **DICAS IA:** Especifique um ativo para análise detalhada")
-
-        elif intent.intent == "chat" or intent.intent == "other":
-            # GENERAL CHAT RESPONSE
-            async with OllamaClient() as ollama:
-                chat_result = await ollama._request("POST", "/api/chat", json={
-                    "model": "qwen2.5-coder",
-                    "messages": [{
-                        "role": "system",
-                        "content": """You are an expert trading assistant AI. Provide helpful, accurate responses about trading, markets, and investment strategies. Be conversational but professional."""
-                    }, {
-                        "role": "user",
-                        "content": message
-                    }],
-                    "stream": False
-                })
-
-                ai_response = chat_result.get("message", {}).get("content", "")
-                response_parts.append(f"🤖 **IA:** {ai_response}")
-
-        else:
-            # FALLBACK RESPONSE
-            response_parts.append("🤔 **IA PENSANDO:** Não entendi completamente sua solicitação.")
-            response_parts.append("📝 **SUGESTÕES:** Tente frases como:")
-            response_parts.append("• 'Comprar 0.1 EURUSD com stop loss 20 pips'")
-            response_parts.append("• 'Qual o preço do BTCUSD?'")
-            response_parts.append("• 'Análise do mercado forex'")
-
-        # COMBINE ALL RESPONSE PARTS
-        final_response = "\n".join(response_parts)
-
-        return {
-            "response": final_response,
-            "intent": intent.model_dump() if hasattr(intent, 'model_dump') else intent.__dict__,
-            "result": {"status": "success", "message": "AI analysis completed"},
-            "timestamp": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        error_msg = f"❌ **ERRO IA:** {str(e)}"
-        logger.error(f"AI message processing failed: {e}")
-        return {
-            "response": error_msg,
-            "intent": {"intent": "error", "confidence": 0.0},
-            "result": {"status": "error", "message": str(e)},
-            "timestamp": datetime.now().isoformat()
-        }
+def _extract_price_from_message(message: str) -> float:
+    """Extracts price from a message."""
+    import re
+    match = re.search(r'(\d+\.?\d+)', message)
+    return float(match.group(1)) if match else None

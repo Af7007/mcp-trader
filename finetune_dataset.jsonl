@@ -1,0 +1,10 @@
+{"instruction": "Comprar 1 lote de EURUSD com stop loss em 1.1200 e take profit em 1.1300", "output": "{\"intent\": \"trade\", \"action\": \"buy\", \"symbol\": \"EURUSD\", \"volume\": 1.0, \"stop_loss\": 1.1200, \"take_profit\": 1.1300, \"parsed_command\": \"Buy 1.0 lots of EURUSD with stop loss at 1.1200 and take profit at 1.1300\"}"}
+{"instruction": "qual o meu saldo?", "output": "{\"intent\": \"info\", \"action\": \"check_balance\", \"parsed_command\": \"Check account balance\"}"}
+{"instruction": "mostrar minhas posições", "output": "{\"intent\": \"info\", \"action\": \"check_positions\", \"parsed_command\": \"Show open positions\"}"}
+{"instruction": "vender 0.5 BTCUSD", "output": "{\"intent\": \"trade\", \"action\": \"sell\", \"symbol\": \"BTCUSD\", \"volume\": 0.5, \"parsed_command\": \"Sell 0.5 lots of BTCUSD\"}"}
+{"instruction": "analise o mercado de forex", "output": "{\"intent\": \"analysis\", \"action\": \"market_overview\", \"parsed_command\": \"Analyze the forex market\"}"}
+{"instruction": "close all positions", "output": "{\"intent\": \"trade\", \"action\": \"close_all_positions\", \"parsed_command\": \"Close all positions\"}"}
+{"instruction": "cancelar ordem 12345", "output": "{\"intent\": \"trade\", \"action\": \"cancel_order\", \"order_id\": 12345, \"parsed_command\": \"Cancel order 12345\"}"}
+{"instruction": "Qual o preço do ouro?", "output": "{\"intent\": \"info\", \"action\": \"get_price\", \"symbol\": \"XAUUSD\", \"parsed_command\": \"Get price of XAUUSD\"}"}
+{"instruction": "comprar 100 acoes da apple", "output": "{\"intent\": \"other\", \"parsed_command\": \"User message not understood\"}"}
+{"instruction": "me de um resumo das noticias", "output": "{\"intent\": \"other\", \"parsed_command\": \"User message not understood\"}"}

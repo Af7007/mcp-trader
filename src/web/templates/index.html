@@ -431,6 +431,73 @@
                 border-color: #718096;
             }
         }
+
+        /* Pulse animation for real-time indicator */
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        /* Enhanced agent item styles */
+        .agent-item {
+            transition: all 0.3s ease;
+        }
+
+        .agent-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Button hover effects */
+        .quick-btn {
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Status indicators with better visibility */
+        .status-dot {
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .status-dot.healthy {
+            box-shadow: 0 0 6px #51cf66;
+        }
+
+        .status-dot.warning {
+            box-shadow: 0 0 6px #ffd43b;
+        }
+
+        /* Enhanced grid layout for agent summary */
+        .agent-summary {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Better spacing for bulk operations */
+        .bulk-controls {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .worker-controls {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
     </style>
 </head>
 <body>
@@ -479,14 +546,17 @@
                         <button class="quick-btn" onclick="sendQuickMessage('Mostrar minhas posições abertas')">
                             <i class="fas fa-chart-line"></i> Ver Posições
                         </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('Qual é a melhor oportunidade de trading agora?')">
-                            <i class="fas fa-search"></i> Análise de Mercado
+                        <button class="quick-btn" onclick="sendQuickMessage('Comprar XAUUSDc 0.01 lots')">
+                            <i class="fas fa-shopping-cart"></i> <span style="color: #FFD700;">Comprar OURO</span>
                         </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('Comprar EURUSD 0.01 lots')">
-                            <i class="fas fa-shopping-cart"></i> Compra EURUSD
+                        <button class="quick-btn" onclick="sendQuickMessage('Vender XAUUSDc 0.01 lots')">
+                            <i class="fas fa-sell"></i> <span style="color: #FFD700;">Vender OURO</span>
                         </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('Vender BTCUSD 0.001 lots')">
-                            <i class="fas fa-sell"></i> Venda BTCUSD
+                        <button class="quick-btn" onclick="sendQuickMessage('Comprar BTCUSDc 0.001 lots')">
+                            <i class="fas fa-shopping-cart"></i> <span style="color: #FFA500;">Comprar BITCOIN</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('Vender BTCUSDc 0.001 lots')">
+                            <i class="fas fa-sell"></i> <span style="color: #FFA500;">Vender BITCOIN</span>
                         </button>
                     </div>
                 </div>
@@ -495,6 +565,76 @@
                     <h3><i class="fas fa-coins"></i> Símbolos Populares</h3>
                     <div class="symbol-list" id="symbols-list">
                         <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Agent Management Section -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-robot"></i> Agent Manager</h3>
+
+                    <!-- Worker Control -->
+                    <div class="worker-controls" style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <i class="fas fa-cog"></i>
+                            <span style="font-weight: bold; font-size: 0.9rem;">Worker Status</span>
+                            <span id="worker-indicator" class="status-dot" style="margin-left: auto;"></span>
+                        </div>
+                        <button class="quick-btn" onclick="toggleWorker()" style="width: 100%; font-size: 0.8rem; padding: 8px;">
+                            <i class="fas fa-play" id="worker-icon"></i> <span id="worker-status">Iniciar Worker</span>
+                        </button>
+                    </div>
+
+                    <!-- Bulk Operations -->
+                    <div class="bulk-controls" style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                        <div style="font-weight: bold; font-size: 0.9rem; margin-bottom: 8px;">
+                            <i class="fas fa-layer-group"></i> Operações em Lote
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                            <button class="quick-btn" onclick="pauseAllAgents()" style="font-size: 0.7rem; padding: 6px;">
+                                <i class="fas fa-pause"></i> Pausar Todos
+                            </button>
+                            <button class="quick-btn" onclick="resumeAllAgents()" style="font-size: 0.7rem; padding: 6px;">
+                                <i class="fas fa-play"></i> Retomar Todos
+                            </button>
+                            <button class="quick-btn" onclick="stopAllAgents()" style="font-size: 0.7rem; padding: 6px;">
+                                <i class="fas fa-stop"></i> Parar Todos
+                            </button>
+                            <button class="quick-btn" onclick="refreshAllData()" style="font-size: 0.7rem; padding: 6px;">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Agent Controls -->
+                    <div class="agent-controls" style="margin-bottom: 15px;">
+                        <button class="quick-btn" onclick="showCreateAgentModal()" style="width: 100%; margin-bottom: 8px;">
+                            <i class="fas fa-plus"></i> Criar Novo Agente
+                        </button>
+                        <button class="quick-btn" onclick="showAgentStats()" style="width: 100%;">
+                            <i class="fas fa-chart-bar"></i> Ver Estatísticas
+                        </button>
+                    </div>
+
+                    <!-- Agent Summary -->
+                    <div class="agent-summary" id="agent-summary" style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.8rem;">
+                        <!-- Populated by JavaScript -->
+                    </div>
+
+                    <!-- Agents List -->
+                    <div class="agents-list-container">
+                        <div style="display: flex; align-items: center; justify-content: between; margin-bottom: 10px;">
+                            <h4 style="margin: 0; font-size: 0.9rem;">Agentes Ativos</h4>
+                            <span id="agents-count" style="font-size: 0.7rem; opacity: 0.8;">0</span>
+                        </div>
+                        <div class="agents-list" id="agents-list" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Real-time Updates Indicator -->
+                    <div class="realtime-indicator" id="realtime-indicator" style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 6px; font-size: 0.7rem; text-align: center; display: none;">
+                        <i class="fas fa-circle" style="color: #51cf66; animation: pulse 2s infinite;"></i>
+                        <span>Atualização em tempo real ativa</span>
                     </div>
                 </div>
             </div>
@@ -507,7 +647,7 @@
                         <div class="message-content">
                             <i class="fas fa-robot"></i> <strong>Trading Bot:</strong><br><br>
                             Olá! Sou seu assistente de trading inteligente. Posso ajudar você com:<br><br>
-                            • <strong>Ordens de compra/venda:</strong> "Comprar 100 EURUSD" ou "Vender 0.01 BTCUSD com stop loss"<br>
+                            • <strong>Ordens de compra/venda:</strong> "Comprar 0.01 XAUUSDc" ou "Vender 0.001 BTCUSDc"<br>
                             • <strong>Informações da conta:</strong> "Quanto tenho de saldo?" ou "Mostrar posições"<br>
                             • <strong>Análises:</strong> "Analisar EURUSD" ou "Melhores oportunidades agora"<br>
                             • <strong>Ordens pendentes:</strong> "Mostrar ordens ativas" ou "Cancelar ordem 123"<br><br>
@@ -529,7 +669,7 @@
                     <textarea
                         id="message-input"
                         class="message-input"
-                        placeholder="Digite sua mensagem aqui... (ex: 'Comprar EURUSD 0.01 lots')"
+                        placeholder="Digite sua mensagem aqui... (ex: 'Comprar XAUUSDc 0.01 lots')"
                         rows="1"
                         onkeydown="handleKeyDown(event)"
                         oninput="autoResizeTextarea()"
@@ -666,7 +806,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
-                        use_ollama: aiMode  // Include AI mode flag
+                        use_ollama: aiMode  // TRUE = Mode IA Inteligente | FALSE = Mode Direto MT5
                     })
                 });
 
@@ -839,7 +979,7 @@
             } else {
                 modeText.textContent = '🤖 Modo Direto MT5';
                 modeHint.textContent = 'Use \'ok\' para confirmar';
-                messageInput.placeholder = 'Digite sua mensagem aqui... (ex: \'Comprar EURUSD 0.01 lots\')';
+                messageInput.placeholder = 'Digite sua mensagem aqui... (ex: \'Comprar XAUUSDc 0.01 lots\')';
                 addMessage('⚡ <strong>MODO DIRETO MT5 ATIVADO</strong><br><br>Agora você conversa diretamente com o MetaTrader 5 através de comandos simples em português.', 'system');
             }
 
@@ -858,6 +998,565 @@
 
         // Update status periodically
         setInterval(updateStatusDots, 30000); // Every 30 seconds
+
+        // Agent Management Functions
+        let workerRunning = false;
+
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agents');
+                const result = await response.json();
+
+                if (result.success) {
+                    displayAgents(result.agents);
+                    displayAgentSummary(result.summary);
+                } else {
+                    console.error('Failed to load agents:', result.error);
+                }
+            } catch (error) {
+                console.error('Error loading agents:', error);
+            }
+        }
+
+        function displayAgents(agents) {
+            const agentsList = document.getElementById('agents-list');
+            agentsList.innerHTML = '';
+
+            if (agents.length === 0) {
+                agentsList.innerHTML = '<p style="font-size: 0.8rem; color: #6c757d;">Nenhum agente criado</p>';
+                return;
+            }
+
+            agents.forEach(agent => {
+                const agentDiv = document.createElement('div');
+                agentDiv.className = 'agent-item';
+                agentDiv.style.cssText = `
+                    padding: 8px;
+                    margin-bottom: 8px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 6px;
+                    font-size: 0.8rem;
+                `;
+
+                const statusColor = agent.status === 'active' ? '#51cf66' :
+                                  agent.status === 'paused' ? '#ffd43b' : '#ff6b6b';
+
+                agentDiv.innerHTML = `
+                    <div style="font-weight: bold; color: ${statusColor};">${agent.name}</div>
+                    <div style="font-size: 0.7rem; opacity: 0.8;">
+                        ${agent.symbol} | Vol: ${agent.volume} | TP: $${agent.take_profit}
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <button onclick="pauseAgent('${agent.id}')" style="font-size: 0.7rem; padding: 2px 6px; margin-right: 4px;">⏸️</button>
+                        <button onclick="resumeAgent('${agent.id}')" style="font-size: 0.7rem; padding: 2px 6px; margin-right: 4px;">▶️</button>
+                        <button onclick="deleteAgent('${agent.id}')" style="font-size: 0.7rem; padding: 2px 6px;">🗑️</button>
+                    </div>
+                `;
+
+                agentsList.appendChild(agentDiv);
+            });
+        }
+
+        function displayAgentSummary(summary) {
+            const summaryDiv = document.getElementById('agent-summary');
+            if (summary) {
+                summaryDiv.innerHTML = `
+                    <div><strong>Total:</strong> ${summary.total_agents}</div>
+                    <div><strong>Ativos:</strong> ${summary.active}</div>
+                    <div><strong>Worker:</strong> ${summary.worker_running ? 'Rodando' : 'Parado'}</div>
+                `;
+            }
+        }
+
+        async function showCreateAgentModal() {
+            const message = prompt('Digite o comando para criar agente (ex: "criar agente EURUSD com RSI"):');
+            if (message) {
+                try {
+                    const response = await fetch('/api/agents/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: message })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        addMessage(`✅ ${result.message}`, 'confirmed');
+                        loadAgents(); // Refresh agents list
+                    } else {
+                        addMessage(`❌ Erro: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error creating agent:', error);
+                    addMessage('Falha ao criar agente', 'error');
+                }
+            }
+        }
+
+        async function pauseAgent(agentId) {
+            try {
+                const response = await fetch(`/api/agents/${agentId}/pause`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error pausing agent:', error);
+                addMessage('Falha ao pausar agente', 'error');
+            }
+        }
+
+        async function resumeAgent(agentId) {
+            try {
+                const response = await fetch(`/api/agents/${agentId}/resume`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error resuming agent:', error);
+                addMessage('Falha ao retomar agente', 'error');
+            }
+        }
+
+        async function deleteAgent(agentId) {
+            if (confirm('Tem certeza que deseja deletar este agente?')) {
+                try {
+                    const response = await fetch(`/api/agents/${agentId}/delete`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        addMessage(`✅ ${result.message}`, 'confirmed');
+                        loadAgents();
+                    } else {
+                        addMessage(`❌ ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting agent:', error);
+                    addMessage('Falha ao deletar agente', 'error');
+                }
+            }
+        }
+
+        async function toggleWorker() {
+            try {
+                const workerStatus = document.getElementById('worker-status');
+
+                if (workerRunning) {
+                    const response = await fetch('/api/agents/worker/stop', {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        workerRunning = false;
+                        workerStatus.textContent = 'Iniciar Worker';
+                        addMessage(`✅ ${result.message}`, 'confirmed');
+                    }
+                } else {
+                    const response = await fetch('/api/agents/worker/start', {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        workerRunning = true;
+                        workerStatus.textContent = 'Parar Worker';
+                        addMessage(`✅ ${result.message}`, 'confirmed');
+                    }
+                }
+
+                loadAgents(); // Refresh summary
+
+            } catch (error) {
+                console.error('Error toggling worker:', error);
+                addMessage('Falha ao controlar worker', 'error');
+            }
+        }
+
+        // Load agents on page load
+        window.onload = async () => {
+            updateStatusDots();
+            await initializeChatbot();
+            loadSymbols();
+            loadAgents(); // Load agents on startup
+            messageInput.focus();
+
+            // Load agents every 10 seconds
+            setInterval(loadAgents, 10000);
+        };
+
+        // Advanced Agent Management Functions
+        async function refreshAllData() {
+            addMessage('🔄 Atualizando todos os dados...', 'info');
+            await loadAgents();
+            await updateWorkerStatus();
+            addMessage('✅ Dados atualizados com sucesso!', 'confirmed');
+        }
+
+        async function updateWorkerStatus() {
+            try {
+                const response = await fetch('/api/agents/worker/status');
+                const result = await response.json();
+
+                if (result.success) {
+                    workerRunning = result.worker_running;
+                    updateWorkerUI();
+                    displayAgentSummary(result.summary);
+                }
+            } catch (error) {
+                console.error('Error updating worker status:', error);
+            }
+        }
+
+        function updateWorkerUI() {
+            const workerStatus = document.getElementById('worker-status');
+            const workerIcon = document.getElementById('worker-icon');
+            const workerIndicator = document.getElementById('worker-indicator');
+
+            if (workerRunning) {
+                workerStatus.textContent = 'Parar Worker';
+                workerIcon.className = 'fas fa-stop';
+                workerIndicator.className = 'status-dot healthy';
+            } else {
+                workerStatus.textContent = 'Iniciar Worker';
+                workerIcon.className = 'fas fa-play';
+                workerIndicator.className = 'status-dot';
+            }
+        }
+
+        async function pauseAllAgents() {
+            try {
+                const response = await fetch('/api/agents/bulk/pause', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error pausing all agents:', error);
+                addMessage('Falha ao pausar todos os agentes', 'error');
+            }
+        }
+
+        async function resumeAllAgents() {
+            try {
+                const response = await fetch('/api/agents/bulk/resume', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error resuming all agents:', error);
+                addMessage('Falha ao retomar todos os agentes', 'error');
+            }
+        }
+
+        async function stopAllAgents() {
+            try {
+                const response = await fetch('/api/agents/bulk/stop', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error stopping all agents:', error);
+                addMessage('Falha ao parar todos os agentes', 'error');
+            }
+        }
+
+        async function showAgentStats() {
+            try {
+                const response = await fetch('/api/agents/stats/all');
+                const result = await response.json();
+
+                if (result.success) {
+                    displayDetailedStats(result.stats);
+                } else {
+                    addMessage(`❌ Erro ao carregar estatísticas: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error loading agent stats:', error);
+                addMessage('Falha ao carregar estatísticas dos agentes', 'error');
+            }
+        }
+
+        function displayDetailedStats(stats) {
+            let statsMessage = '📊 **ESTATÍSTICAS DETALHADAS DOS AGENTES:**\n\n';
+
+            if (stats.length === 0) {
+                statsMessage += 'Nenhum agente encontrado.\n';
+            } else {
+                stats.forEach((stat, index) => {
+                    const statusEmoji = stat.status === 'active' ? '🟢' :
+                                      stat.status === 'paused' ? '🟡' : '🔴';
+
+                    statsMessage += `${index + 1}. **${stat.name}** ${statusEmoji}\n`;
+                    statsMessage += `   📈 Trades: ${stat.trades_opened} abertos, ${stat.trades_closed} fechados\n`;
+                    statsMessage += `   💰 Lucro Total: $${stat.total_profit.toFixed(2)}\n`;
+                    statsMessage += `   ⏱️ Uptime: ${Math.floor(stat.uptime_seconds / 60)}min ${Math.floor(stat.uptime_seconds % 60)}s\n`;
+                    statsMessage += `   ❌ Erros: ${stat.errors_count}\n`;
+                    statsMessage += `   🎯 Indicadores: ${stat.indicators.join(', ')}\n\n`;
+                });
+            }
+
+            addMessage(statsMessage, 'info');
+        }
+
+        async function showAgentHistory(agentId) {
+            try {
+                const response = await fetch(`/api/agents/${agentId}/history`);
+                const result = await response.json();
+
+                if (result.success) {
+                    displayAgentHistory(result.history, result.agent_id);
+                } else {
+                    addMessage(`❌ Erro ao carregar histórico: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error loading agent history:', error);
+                addMessage('Falha ao carregar histórico do agente', 'error');
+            }
+        }
+
+        function displayAgentHistory(history, agentId) {
+            let historyMessage = `📜 **HISTÓRICO DO AGENTE ${agentId.toUpperCase()}:**\n\n`;
+
+            if (history.length === 0) {
+                historyMessage += 'Nenhum evento registrado.\n';
+            } else {
+                history.slice(0, 10).forEach((event, index) => {
+                    const timestamp = new Date(event.timestamp).toLocaleString('pt-BR');
+                    const eventEmoji = getEventEmoji(event.type);
+
+                    historyMessage += `${index + 1}. ${eventEmoji} **${event.type.toUpperCase()}**\n`;
+                    historyMessage += `   📅 ${timestamp}\n`;
+
+                    if (event.details && Object.keys(event.details).length > 0) {
+                        Object.entries(event.details).forEach(([key, value]) => {
+                            historyMessage += `   🔹 ${key}: ${value}\n`;
+                        });
+                    }
+                    historyMessage += '\n';
+                });
+            }
+
+            addMessage(historyMessage, 'info');
+        }
+
+        function getEventEmoji(eventType) {
+            const emojis = {
+                'created': '🆕',
+                'started': '▶️',
+                'paused': '⏸️',
+                'resumed': '▶️',
+                'stopped': '⏹️',
+                'trade_opened': '🟢',
+                'trade_closed': '🔴',
+                'error': '❌',
+                'deleted': '🗑️'
+            };
+            return emojis[eventType] || '📝';
+        }
+
+        // Enhanced agent display with more details
+        function displayAgents(agents) {
+            const agentsList = document.getElementById('agents-list');
+            const agentsCount = document.getElementById('agents-count');
+            agentsList.innerHTML = '';
+
+            // Update count
+            agentsCount.textContent = agents.length;
+
+            if (agents.length === 0) {
+                agentsList.innerHTML = '<p style="font-size: 0.8rem; color: #6c757d;">Nenhum agente criado</p>';
+                return;
+            }
+
+            agents.forEach(agent => {
+                const agentDiv = document.createElement('div');
+                agentDiv.className = 'agent-item';
+                agentDiv.style.cssText = `
+                    padding: 10px;
+                    margin-bottom: 8px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    font-size: 0.8rem;
+                    border-left: 3px solid ${getStatusColor(agent.status)};
+                `;
+
+                const statusColor = getStatusColor(agent.status);
+                const statusIcon = getStatusIcon(agent.status);
+
+                agentDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: between; margin-bottom: 6px;">
+                        <div style="font-weight: bold; color: ${statusColor};">${statusIcon} ${agent.name}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.7;">ID: ${agent.id.substring(0, 8)}...</div>
+                    </div>
+                    <div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 6px;">
+                        📈 ${agent.symbol} | Vol: ${agent.volume} | TP: $${agent.take_profit} | SL: $${agent.stop_loss}
+                    </div>
+                    <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 8px;">
+                        🎯 Indicadores: ${agent.indicators.join(', ')}
+                    </div>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        <button onclick="pauseAgent('${agent.id}')" style="font-size: 0.7rem; padding: 3px 8px;" title="Pausar">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button onclick="resumeAgent('${agent.id}')" style="font-size: 0.7rem; padding: 3px 8px;" title="Retomar">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button onclick="stopAgent('${agent.id}')" style="font-size: 0.7rem; padding: 3px 8px;" title="Parar">
+                            <i class="fas fa-stop"></i>
+                        </button>
+                        <button onclick="showAgentHistory('${agent.id}')" style="font-size: 0.7rem; padding: 3px 8px;" title="Histórico">
+                            <i class="fas fa-history"></i>
+                        </button>
+                        <button onclick="deleteAgent('${agent.id}')" style="font-size: 0.7rem; padding: 3px 8px; color: #ff6b6b;" title="Deletar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+
+                agentsList.appendChild(agentDiv);
+            });
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'active': '#51cf66',
+                'paused': '#ffd43b',
+                'stopped': '#ff6b6b',
+                'error': '#ff4757'
+            };
+            return colors[status] || '#6c757d';
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                'active': '🟢',
+                'paused': '🟡',
+                'stopped': '🔴',
+                'error': '❌'
+            };
+            return icons[status] || '⚪';
+        }
+
+        function displayAgentSummary(summary) {
+            const summaryDiv = document.getElementById('agent-summary');
+            if (summary) {
+                const workerStatus = workerRunning ? '🟢 Rodando' : '🔴 Parado';
+                summaryDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.7rem;">
+                        <div><strong>🤖 Total:</strong> ${summary.total_agents || 0}</div>
+                        <div><strong>🟢 Ativos:</strong> ${summary.active || 0}</div>
+                        <div><strong>🟡 Pausados:</strong> ${summary.paused || 0}</div>
+                        <div><strong>🔴 Parados:</strong> ${summary.stopped || 0}</div>
+                        <div><strong>📊 Trades:</strong> ${summary.total_trades || 0}</div>
+                        <div><strong>💰 Lucro:</strong> $${(summary.total_profit || 0).toFixed(2)}</div>
+                        <div style="grid-column: 1 / -1;"><strong>⚙️ Worker:</strong> ${workerStatus}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Enhanced toggle worker function
+        async function toggleWorker() {
+            try {
+                const response = await fetch('/api/agents/worker/toggle', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    workerRunning = result.worker_running;
+                    updateWorkerUI();
+                    displayAgentSummary(result.summary);
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+
+                    // Show real-time indicator if worker started
+                    if (workerRunning) {
+                        showRealtimeIndicator();
+                    } else {
+                        hideRealtimeIndicator();
+                    }
+                } else {
+                    addMessage(`❌ ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling worker:', error);
+                addMessage('Falha ao controlar worker', 'error');
+            }
+        }
+
+        function showRealtimeIndicator() {
+            const indicator = document.getElementById('realtime-indicator');
+            indicator.style.display = 'block';
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 3000);
+        }
+
+        function hideRealtimeIndicator() {
+            const indicator = document.getElementById('realtime-indicator');
+            indicator.style.display = 'none';
+        }
+
+        // Add stop agent function
+        async function stopAgent(agentId) {
+            try {
+                const response = await fetch(`/api/agents/${agentId}/stop`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addMessage(`✅ ${result.message}`, 'confirmed');
+                    loadAgents();
+                } else {
+                    addMessage(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error stopping agent:', error);
+                addMessage('Falha ao parar agente', 'error');
+            }
+        }
+
+        // Initialize worker status on load
+        setTimeout(updateWorkerStatus, 1000);
     </script>
 </body>
 </html>
