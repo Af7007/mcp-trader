@@ -7,7 +7,7 @@ echo.
 echo  ATENCAO: Este agente vai operar com DINHEIRO REAL!
 echo.
 echo  Configuracao:
-echo    - Simbolo: BTCUSDc
+echo    - Simbolo: BTCUSDm
 echo    - Volume: 0.02 lots
 echo    - Target Profit: $2 por operacao
 echo    - Limite Diario: 20 operacoes
@@ -54,8 +54,8 @@ echo.
 
 timeout /t 3 /nobreak >nul
 
-REM Executar agente com BTCUSDc
-uv run python src\agents\btc_hedge_agent.py BTCUSDc 0.02
+REM Executar agente com BTCUSDm
+uv run python src\agents\btc_hedge_agent.py BTCUSDm 0.02
 
 echo.
 echo ============================================================

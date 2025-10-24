@@ -254,7 +254,7 @@ The Hedge Agent (`src/agents/btc_hedge_agent.py`) is a fully automated trading s
 **Available Symbols:**
 
 *Crypto/Commodities:*
-- **BTCUSDc** (Bitcoin): 0.02 lots - `RUN_BTC_AGENT.bat`
+- **BTCUSDm** (Bitcoin): 0.02 lots - `RUN_BTC_AGENT.bat`
 - **XAUUSDc** (Gold): 0.01 lots - `RUN_GOLD_AGENT.bat`
 
 *Forex:*
@@ -309,7 +309,7 @@ The MT5 dashboard (`BTC_Agent_Dashboard.mq5`) provides real-time visualization o
 1. Open MT5 → Tools → MQL5 Editor (F4)
 2. Open `BTC_Agent_Dashboard.mq5`
 3. Compile (F7)
-4. Add to BTCUSDc chart
+4. Add to BTCUSDm chart
 5. Dashboard updates every 5 seconds
 
 **Display Features:**
@@ -342,7 +342,7 @@ Database includes:
 - `AGENTES_MULTIPLOS.md`: Multi-symbol trading guide (5 symbols)
 - `DASHBOARD_MT5_VISUAL.md`: Complete dashboard setup guide
 - `INICIAR_TESTE_BTC.md`: BTC agent usage instructions
-- `test_btc_symbol.py`: Validates BTCUSDc availability
+- `test_btc_symbol.py`: Validates BTCUSDm availability
 - `test_gold_symbol.py`: Validates XAUUSDc availability
 - `test_forex_symbols.py`: Validates all Forex symbols (GBP, EUR, JPY)
 

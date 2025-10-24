@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Testa se BTCUSDc está disponível e funcionando"""
+"""Testa se BTCUSDm está disponível e funcionando"""
 
 import sys
 from pathlib import Path
@@ -17,18 +17,18 @@ def test_btc_symbol():
 
     mt5 = get_mt5_client()
 
-    # Testar BTCUSDc
-    print("[1] Testando BTCUSDc...")
-    symbol_info = mt5.get_symbol_info("BTCUSDc")
+    # Testar BTCUSDm
+    print("[1] Testando BTCUSDm...")
+    symbol_info = mt5.get_symbol_info("BTCUSDm")
     if symbol_info:
-        print(f"    ✅ BTCUSDc encontrado!")
+        print(f"    ✅ BTCUSDm encontrado!")
         print(f"       Bid: ${symbol_info.get('bid', 0):,.2f}")
         print(f"       Ask: ${symbol_info.get('ask', 0):,.2f}")
         print(f"       Spread: {symbol_info.get('spread', 0)} points")
         print(f"       Volume Min: {symbol_info.get('volume_min', 0)}")
         print(f"       Volume Max: {symbol_info.get('volume_max', 0)}")
     else:
-        print("    ❌ BTCUSDc NÃO encontrado")
+        print("    ❌ BTCUSDm NÃO encontrado")
 
     print()
 
@@ -45,9 +45,9 @@ def test_btc_symbol():
     print()
 
     # Testar rates
-    print("[3] Testando obtenção de rates para BTCUSDc...")
+    print("[3] Testando obtenção de rates para BTCUSDm...")
     rates = mt5.copy_rates_from_pos(
-        symbol="BTCUSDc",
+        symbol="BTCUSDm",
         timeframe="M5",
         start_pos=0,
         count=10
@@ -70,11 +70,11 @@ def test_btc_symbol():
     print()
 
     if symbol_info and rates:
-        print("🎯 BTCUSDc está OK para usar no agente!")
+        print("🎯 BTCUSDm está OK para usar no agente!")
         return True
     else:
-        print("❌ BTCUSDc não está disponível. Verifique:")
-        print("   1. BTCUSDc está no Market Watch do MT5?")
+        print("❌ BTCUSDm não está disponível. Verifique:")
+        print("   1. BTCUSDm está no Market Watch do MT5?")
         print("   2. Adicione o símbolo no MT5")
         return False
 

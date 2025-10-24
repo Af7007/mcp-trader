@@ -60,7 +60,7 @@ class Settings:
     WS_MAX_CONNECTIONS: int = 100
 
     # Scalping Bot (default settings)
-    SCALPING_SYMBOL: str = os.getenv("SCALPING_SYMBOL", "BTCUSDc")
+    SCALPING_SYMBOL: str = os.getenv("SCALPING_SYMBOL", "BTCUSDm")
     SCALPING_TIMEFRAME: str = os.getenv("SCALPING_TIMEFRAME", "M5")
     SCALPING_CONFIDENCE_THRESHOLD: int = int(os.getenv("SCALPING_CONFIDENCE_THRESHOLD", "85"))
     SCALPING_VOLUME: float = float(os.getenv("SCALPING_VOLUME", "0.01"))

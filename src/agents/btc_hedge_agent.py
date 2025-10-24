@@ -49,7 +49,7 @@ class BTCHedgeAgent:
 
     def __init__(
         self,
-        symbol: str = "BTCUSDc",
+        symbol: str = "BTCUSDm",
         volume: float = 0.02,
         target_profit: float = 2.0,
         max_daily_trades: int = 20,
@@ -737,7 +737,7 @@ def main():
     import sys
 
     # Permitir passar símbolo como argumento
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDc"
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDm"
     volume = float(sys.argv[2]) if len(sys.argv) > 2 else 0.02
 
     logger.info(f"Iniciando com símbolo: {symbol}, volume: {volume}")

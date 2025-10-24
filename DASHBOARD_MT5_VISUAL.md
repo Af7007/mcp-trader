@@ -17,7 +17,7 @@ RUN_BTC_AGENT.bat
 ```
 
 O agente vai:
-- Operar normalmente com BTCUSDc
+- Operar normalmente com BTCUSDm
 - Exportar dados a cada 30 segundos para: `C:\mcp-trader\agent_data.json`
 
 ### 2. Adicionar Dashboard no MT5
@@ -27,7 +27,7 @@ O agente vai:
 3. No MetaEditor, abra o arquivo: `BTC_Agent_Dashboard.mq5`
 4. Compile o arquivo (F7) - deve compilar sem erros
 5. Volte ao MT5
-6. Abra um gráfico do **BTCUSDc** (qualquer timeframe)
+6. Abra um gráfico do **BTCUSDm** (qualquer timeframe)
 7. Arraste o Expert Advisor **BTC_Agent_Dashboard** para o gráfico
 8. Confirme "Permitir trading automatizado"
 
@@ -47,7 +47,7 @@ O agente vai:
   Streak: 3
   Hedge: ATIVO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  💹 MERCADO (BTCUSDc)
+  💹 MERCADO (BTCUSDm)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Preço: $45,234.50
   Trend: UP
@@ -95,7 +95,7 @@ O agente vai:
 {
   "agent": "BTC_Hedge_Agent",
   "state": "trading",
-  "symbol": "BTCUSDc",
+  "symbol": "BTCUSDm",
   "daily_trades": 5,
   "max_daily_trades": 20,
   "total_profit": 10.50,
@@ -158,7 +158,7 @@ No código MQL5 (`BTC_Agent_Dashboard.mq5`), você pode ajustar:
 ## 🎯 Teste Completo
 
 1. **Terminal 1**: Execute `RUN_BTC_AGENT.bat`
-2. **MT5**: Adicione o dashboard ao gráfico BTCUSDc
+2. **MT5**: Adicione o dashboard ao gráfico BTCUSDm
 3. Aguarde 30 segundos para o primeiro ciclo
 4. O painel deve aparecer no canto superior esquerdo
 5. Os indicadores devem ser desenhados no gráfico

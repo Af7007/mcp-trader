@@ -10,7 +10,7 @@ Execute a mesma estratégia de hedge simultaneamente em diferentes símbolos par
 
 ### Crypto/Commodities
 
-#### 1. Bitcoin (BTCUSDc)
+#### 1. Bitcoin (BTCUSDm)
 - **Volume**: 0.02 lots
 - **Características**: Alta volatilidade, movimentos grandes
 - **ATR Médio**: ~150-300 pontos
@@ -94,9 +94,9 @@ Cada janela representa um agente independente com:
 
 ## ⚙️ Configurações por Símbolo
 
-### BTCUSDc (Bitcoin)
+### BTCUSDm (Bitcoin)
 ```
-Symbol: BTCUSDc
+Symbol: BTCUSDm
 Volume: 0.02 lots
 Target Profit: $2
 Daily Limit: 20 operações
@@ -176,7 +176,7 @@ uv run python test_btc_symbol.py     # Testa bitcoin
 
 O mesmo dashboard funciona para **todos os símbolos**!
 
-1. **Para BTC**: Adicione `BTC_Agent_Dashboard.mq5` ao gráfico BTCUSDc
+1. **Para BTC**: Adicione `BTC_Agent_Dashboard.mq5` ao gráfico BTCUSDm
 2. **Para Gold**: Adicione o mesmo dashboard ao gráfico XAUUSDc
 
 O dashboard detecta automaticamente qual símbolo está sendo negociado através do arquivo `agent_data.json`.
@@ -202,7 +202,7 @@ uv run python ver_trades_banco.py
 ```
 
 O banco mostra:
-- Símbolo de cada trade (BTCUSDc, XAUUSDc, etc.)
+- Símbolo de cada trade (BTCUSDm, XAUUSDc, etc.)
 - Lucros separados
 - Estatísticas consolidadas
 
@@ -260,7 +260,7 @@ taskkill /F /IM python.exe
 ### Cálculo Aproximado por Símbolo
 
 **Crypto/Commodities:**
-- BTCUSDc 0.02 lots: ~$2,000 de margem
+- BTCUSDm 0.02 lots: ~$2,000 de margem
 - XAUUSDc 0.01 lots: ~$300 de margem
 
 **Forex:**
@@ -338,7 +338,7 @@ Isso permite dashboards separados para cada símbolo.
 Antes de iniciar múltiplos agentes:
 
 - [ ] MT5 está aberto e logado
-- [ ] Símbolos estão no Market Watch (BTCUSDc, XAUUSDc)
+- [ ] Símbolos estão no Market Watch (BTCUSDm, XAUUSDc)
 - [ ] Margem livre suficiente ($2,500+)
 - [ ] Scripts de teste executados com sucesso
 - [ ] Banco de dados inicializado (`setup_database()`)
