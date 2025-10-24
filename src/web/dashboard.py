@@ -35,12 +35,12 @@ def get_stats():
         # Lucros/Prejuízos
         cursor.execute("""
             SELECT
-                SUM(CASE WHEN profit > 0 THEN 1 ELSE 0 END) as wins,
-                SUM(CASE WHEN profit <= 0 THEN 1 ELSE 0 END) as losses,
-                SUM(profit) as total_profit,
-                AVG(profit) as avg_profit,
-                MAX(profit) as max_profit,
-                MIN(profit) as min_profit
+                SUM(CASE WHEN result > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN result <= 0 THEN 1 ELSE 0 END) as losses,
+                SUM(result) as total_profit,
+                AVG(result) as avg_profit,
+                MAX(result) as max_profit,
+                MIN(result) as min_profit
             FROM trades
         """)
         stats = cursor.fetchone()
@@ -49,7 +49,7 @@ def get_stats():
 
         # Trades por símbolo
         cursor.execute("""
-            SELECT symbol, COUNT(*) as count, SUM(profit) as profit
+            SELECT symbol, COUNT(*) as count, SUM(result) as profit
             FROM trades
             GROUP BY symbol
             ORDER BY count DESC
@@ -58,7 +58,7 @@ def get_stats():
 
         # Últimos 7 dias
         cursor.execute("""
-            SELECT DATE(open_time) as date, COUNT(*) as count, SUM(profit) as profit
+            SELECT DATE(open_time) as date, COUNT(*) as count, SUM(result) as profit
             FROM trades
             WHERE open_time >= date('now', '-7 days')
             GROUP BY DATE(open_time)
@@ -97,7 +97,7 @@ def get_trades():
         offset = int(request.args.get('offset', 0))
 
         # Query base
-        query = "SELECT id, ticket, symbol, type, volume, open_price, close_price, open_time, close_time, sl, tp, profit FROM trades"
+        query = "SELECT id, ticket, symbol, volume, entry_price, sl_price, tp_price, open_time, close_time, status, result FROM trades"
         params = []
 
         if symbol:
@@ -128,15 +128,14 @@ def get_trades():
                     'id': row[0],
                     'ticket': row[1],
                     'symbol': row[2],
-                    'type': row[3],
-                    'volume': row[4],
-                    'open_price': round(row[5], 5),
-                    'close_price': round(row[6], 5),
+                    'volume': row[3],
+                    'entry_price': round(row[4], 5) if row[4] else 0,
+                    'sl_price': round(row[5], 5) if row[5] else 0,
+                    'tp_price': round(row[6], 5) if row[6] else 0,
                     'open_time': row[7],
                     'close_time': row[8],
-                    'sl': round(row[9], 5),
-                    'tp': round(row[10], 5),
-                    'profit': round(row[11], 2)
+                    'status': row[9],
+                    'result': round(row[10], 2) if row[10] else 0
                 }
                 for row in trades
             ],
@@ -160,29 +159,29 @@ def get_performance():
             SELECT
                 symbol,
                 COUNT(*) as total,
-                SUM(CASE WHEN profit > 0 THEN 1 ELSE 0 END) as wins,
-                SUM(CASE WHEN profit <= 0 THEN 1 ELSE 0 END) as losses,
-                SUM(profit) as total_profit,
-                AVG(profit) as avg_profit,
-                MAX(profit) as max_profit,
-                MIN(profit) as min_profit
+                SUM(CASE WHEN result > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN result <= 0 THEN 1 ELSE 0 END) as losses,
+                SUM(result) as total_profit,
+                AVG(result) as avg_profit,
+                MAX(result) as max_profit,
+                MIN(result) as min_profit
             FROM trades
             GROUP BY symbol
             ORDER BY total DESC
         """)
         by_symbol = cursor.fetchall()
 
-        # Performance por tipo (BUY/SELL)
+        # Performance por status
         cursor.execute("""
             SELECT
-                type,
+                status,
                 COUNT(*) as total,
-                SUM(CASE WHEN profit > 0 THEN 1 ELSE 0 END) as wins,
-                SUM(CASE WHEN profit <= 0 THEN 1 ELSE 0 END) as losses,
-                SUM(profit) as total_profit,
-                AVG(profit) as avg_profit
+                SUM(CASE WHEN result > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN result <= 0 THEN 1 ELSE 0 END) as losses,
+                SUM(result) as total_profit,
+                AVG(result) as avg_profit
             FROM trades
-            GROUP BY type
+            GROUP BY status
         """)
         by_type = cursor.fetchall()
 
@@ -230,8 +229,9 @@ def get_equity_curve():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT close_time, profit
+            SELECT close_time, result
             FROM trades
+            WHERE close_time IS NOT NULL
             ORDER BY close_time ASC
         """)
         trades = cursor.fetchall()
@@ -241,7 +241,8 @@ def get_equity_curve():
         equity_curve = []
 
         for trade in trades:
-            cumulative_profit += trade[1]
+            if trade[1]:  # Se result não é NULL
+                cumulative_profit += trade[1]
             equity_curve.append({
                 'date': trade[0],
                 'equity': round(cumulative_profit, 2)

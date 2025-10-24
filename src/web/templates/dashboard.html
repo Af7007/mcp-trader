@@ -392,6 +392,11 @@
             <div id="tradesTable">
                 <div class="loading"><div class="spinner"></div></div>
             </div>
+
+            <div id="performanceSection" style="margin-top: 30px;">
+                <h3 class="section-title">📊 Performance por Status</h3>
+                <div id="performanceTable"></div>
+            </div>
         </div>
     </div>
 
@@ -637,38 +642,35 @@
                                 <th>ID</th>
                                 <th>Ticket</th>
                                 <th>Símbolo</th>
-                                <th>Tipo</th>
                                 <th>Volume</th>
                                 <th>Entrada</th>
-                                <th>Saída</th>
-                                <th>Abertura</th>
-                                <th>Fechamento</th>
                                 <th>SL</th>
                                 <th>TP</th>
-                                <th>Lucro</th>
+                                <th>Abertura</th>
+                                <th>Fechamento</th>
+                                <th>Status</th>
+                                <th>Resultado</th>
                             </tr>
                         </thead>
                         <tbody>
                 `;
 
                 data.trades.forEach(trade => {
-                    const profitClass = trade.profit > 0 ? 'positive' : (trade.profit < 0 ? 'negative' : 'neutral');
-                    const typeClass = trade.type === 'BUY' ? 'buy' : 'sell';
+                    const resultClass = trade.result > 0 ? 'positive' : (trade.result < 0 ? 'negative' : 'neutral');
 
                     html += `
                         <tr>
                             <td>${trade.id}</td>
                             <td><strong>${trade.ticket}</strong></td>
                             <td><span class="symbol-badge">${trade.symbol}</span></td>
-                            <td><span class="type-badge ${typeClass}">${trade.type}</span></td>
                             <td>${trade.volume}</td>
-                            <td>${trade.open_price.toFixed(5)}</td>
-                            <td>${trade.close_price.toFixed(5)}</td>
-                            <td>${new Date(trade.open_time).toLocaleString()}</td>
-                            <td>${new Date(trade.close_time).toLocaleString()}</td>
-                            <td>${trade.sl.toFixed(5)}</td>
-                            <td>${trade.tp.toFixed(5)}</td>
-                            <td class="profit ${profitClass}">$${trade.profit.toFixed(2)}</td>
+                            <td>${trade.entry_price.toFixed(5)}</td>
+                            <td>${trade.sl_price.toFixed(5)}</td>
+                            <td>${trade.tp_price.toFixed(5)}</td>
+                            <td>${trade.open_time ? new Date(trade.open_time).toLocaleString() : '-'}</td>
+                            <td>${trade.close_time ? new Date(trade.close_time).toLocaleString() : '-'}</td>
+                            <td><span class="type-badge ${trade.status?.toLowerCase() || 'closed'}">${trade.status || 'CLOSED'}</span></td>
+                            <td class="profit ${resultClass}">$${trade.result.toFixed(2)}</td>
                         </tr>
                     `;
                 });
