@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Trades</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: #999;
+            font-size: 0.95em;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(76, 175, 80, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #999;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .stat-value.negative {
+            color: #f44336;
+        }
+
+        .stat-value.neutral {
+            color: #ff9800;
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #4CAF50;
+        }
+
+        .chart-content {
+            position: relative;
+            height: calc(100% - 40px);
+        }
+
+        /* Table */
+        .trades-section {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #4CAF50;
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        label {
+            color: #999;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        thead {
+            background: rgba(76, 175, 80, 0.1);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            color: #4CAF50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tbody tr:hover {
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .profit {
+            font-weight: bold;
+        }
+
+        .profit.positive {
+            color: #4CAF50;
+        }
+
+        .profit.negative {
+            color: #f44336;
+        }
+
+        .symbol-badge {
+            display: inline-block;
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .type-badge.buy {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .type-badge.sell {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .pagination button:hover {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            table {
+                font-size: 0.8em;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(76, 175, 80, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(76, 175, 80, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Dashboard de Trades</h1>
+            <p>Visualize o histórico de todas as suas operações</p>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">📈 Lucro Acumulado</div>
+                <div class="chart-content">
+                    <canvas id="equityChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">💹 Performance por Símbolo</div>
+                <div class="chart-content">
+                    <canvas id="symbolChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 Últimos 7 Dias</div>
+                <div class="chart-content">
+                    <canvas id="last7Chart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">✅ Win vs Loss</div>
+                <div class="chart-content">
+                    <canvas id="winLossChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trades Table -->
+        <div class="trades-section">
+            <h2 class="section-title">🔍 Histórico de Trades</h2>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Símbolo:</label>
+                    <select id="symbolFilter" onchange="loadTrades()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="tradesTable">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cores
+        const colors = {
+            primary: '#4CAF50',
+            success: '#4CAF50',
+            danger: '#f44336',
+            warning: '#ff9800',
+            info: '#2196F3'
+        };
+
+        // Carregar dados ao iniciar
+        async function loadDashboard() {
+            await loadStats();
+            await loadCharts();
+            await loadSymbolFilter();
+            await loadTrades();
+        }
+
+        // Carregar estatísticas
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                const html = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total de Trades</div>
+                        <div class="stat-value">${data.total_trades}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Operações Vencedoras</div>
+                        <div class="stat-value">${data.wins}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Operações Perdedoras</div>
+                        <div class="stat-value negative">${data.losses}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Taxa de Acerto</div>
+                        <div class="stat-value">${data.win_rate}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Lucro Total</div>
+                        <div class="stat-value ${data.total_profit >= 0 ? '' : 'negative'}">$${data.total_profit.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Lucro Médio</div>
+                        <div class="stat-value ${data.avg_profit >= 0 ? '' : 'negative'}">$${data.avg_profit.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Maior Lucro</div>
+                        <div class="stat-value">${data.max_profit.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Maior Prejuízo</div>
+                        <div class="stat-value negative">${data.min_profit.toFixed(2)}</div>
+                    </div>
+                `;
+
+                document.getElementById('statsGrid').innerHTML = html;
+                window.dashboardData = data;
+            } catch (error) {
+                console.error('Erro ao carregar stats:', error);
+            }
+        }
+
+        // Carregar gráficos
+        async function loadCharts() {
+            try {
+                const statsResp = await fetch('/api/stats');
+                const stats = await statsResp.json();
+
+                const perfResp = await fetch('/api/performance');
+                const perf = await perfResp.json();
+
+                const equityResp = await fetch('/api/equity-curve');
+                const equity = await equityResp.json();
+
+                // Gráfico de Lucro Acumulado
+                const equityCtx = document.getElementById('equityChart').getContext('2d');
+                new Chart(equityCtx, {
+                    type: 'line',
+                    data: {
+                        labels: equity.map(e => new Date(e.date).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Patrimônio',
+                            data: equity.map(e => e.equity),
+                            borderColor: colors.primary,
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            },
+                            x: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico de Lucro por Símbolo
+                const symbolCtx = document.getElementById('symbolChart').getContext('2d');
+                new Chart(symbolCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: perf.by_symbol.map(s => s.symbol),
+                        datasets: [{
+                            label: 'Lucro',
+                            data: perf.by_symbol.map(s => s.total_profit),
+                            backgroundColor: perf.by_symbol.map(s => s.total_profit >= 0 ? colors.success : colors.danger),
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            },
+                            x: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico Últimos 7 dias
+                const last7Ctx = document.getElementById('last7Chart').getContext('2d');
+                new Chart(last7Ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: stats.last_7_days.map(d => new Date(d.date).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Trades',
+                            data: stats.last_7_days.map(d => d.count),
+                            backgroundColor: colors.info,
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            },
+                            x: {
+                                ticks: { color: '#999' },
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico Win vs Loss
+                const winLossCtx = document.getElementById('winLossChart').getContext('2d');
+                new Chart(winLossCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Vencedoras', 'Perdedoras'],
+                        datasets: [{
+                            data: [stats.wins, stats.losses],
+                            backgroundColor: [colors.success, colors.danger]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#999' }
+                            }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Erro ao carregar gráficos:', error);
+            }
+        }
+
+        // Carregar filtro de símbolos
+        async function loadSymbolFilter() {
+            try {
+                const response = await fetch('/api/symbols');
+                const symbols = await response.json();
+
+                const select = document.getElementById('symbolFilter');
+                symbols.forEach(symbol => {
+                    const option = document.createElement('option');
+                    option.value = symbol;
+                    option.textContent = symbol;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar símbolos:', error);
+            }
+        }
+
+        // Carregar trades
+        async function loadTrades(page = 0) {
+            try {
+                const symbol = document.getElementById('symbolFilter').value;
+                const limit = 50;
+                const offset = page * limit;
+
+                const url = `/api/trades?limit=${limit}&offset=${offset}${symbol ? '&symbol=' + symbol : ''}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Ticket</th>
+                                <th>Símbolo</th>
+                                <th>Tipo</th>
+                                <th>Volume</th>
+                                <th>Entrada</th>
+                                <th>Saída</th>
+                                <th>Abertura</th>
+                                <th>Fechamento</th>
+                                <th>SL</th>
+                                <th>TP</th>
+                                <th>Lucro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.trades.forEach(trade => {
+                    const profitClass = trade.profit > 0 ? 'positive' : (trade.profit < 0 ? 'negative' : 'neutral');
+                    const typeClass = trade.type === 'BUY' ? 'buy' : 'sell';
+
+                    html += `
+                        <tr>
+                            <td>${trade.id}</td>
+                            <td><strong>${trade.ticket}</strong></td>
+                            <td><span class="symbol-badge">${trade.symbol}</span></td>
+                            <td><span class="type-badge ${typeClass}">${trade.type}</span></td>
+                            <td>${trade.volume}</td>
+                            <td>${trade.open_price.toFixed(5)}</td>
+                            <td>${trade.close_price.toFixed(5)}</td>
+                            <td>${new Date(trade.open_time).toLocaleString()}</td>
+                            <td>${new Date(trade.close_time).toLocaleString()}</td>
+                            <td>${trade.sl.toFixed(5)}</td>
+                            <td>${trade.tp.toFixed(5)}</td>
+                            <td class="profit ${profitClass}">$${trade.profit.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                    <div class="pagination">
+                        <button onclick="loadTrades(${Math.max(0, page - 1)})" ${page === 0 ? 'disabled' : ''}>← Anterior</button>
+                        <span style="padding: 8px 12px;">Página ${page + 1} de ${Math.ceil(data.total / data.limit)}</span>
+                        <button onclick="loadTrades(${page + 1})" ${page + 1 >= Math.ceil(data.total / data.limit) ? 'disabled' : ''}>Próxima →</button>
+                    </div>
+                `;
+
+                document.getElementById('tradesTable').innerHTML = html;
+            } catch (error) {
+                console.error('Erro ao carregar trades:', error);
+            }
+        }
+
+        // Inicializar
+        loadDashboard();
+        setInterval(loadStats, 30000); // Atualizar stats a cada 30s
+    </script>
+</body>
+</html>
