@@ -349,10 +349,29 @@ Database includes:
 ## Environment Variables
 
 ```env
+# MCP Configuration
 MT5_MCP_TRANSPORT=stdio  # or 'http'
 MT5_MCP_HOST=127.0.0.1   # for HTTP mode
 MT5_MCP_PORT=8000        # for HTTP mode
+
+# AI Model Configuration (optional)
+AI_PROVIDER=anthropic           # or 'ollama'
+ANTHROPIC_API_KEY=sk-ant-...    # Your Anthropic API key
+AI_MODEL=claude-3-5-haiku-20241022  # Claude model
+AI_MAX_TOKENS=4096             # Max response tokens
+AI_TEMPERATURE=0.7             # 0.0-1.0
 ```
+
+### Configuring Claude Haiku 4.5
+
+For market analysis and trading decisions using Claude 3.5 Haiku:
+
+1. Get API key from https://console.anthropic.com/
+2. Add to `.env`: `ANTHROPIC_API_KEY=your_key_here`
+3. Set model: `AI_MODEL=claude-3-5-haiku-20241022`
+4. Test: `TESTAR_HAIKU.bat`
+
+**Full guide**: See `CONFIGURAR_HAIKU.md` for complete setup instructions
 
 ## Notes for AI Assistants
 

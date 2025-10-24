@@ -66,5 +66,12 @@ class Settings:
     SCALPING_VOLUME: float = float(os.getenv("SCALPING_VOLUME", "0.01"))
     SCALPING_INTERVAL: int = int(os.getenv("SCALPING_INTERVAL", "60"))
 
+    # AI Model Configuration
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "anthropic")  # "anthropic" or "ollama"
+    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    AI_MODEL: str = os.getenv("AI_MODEL", "claude-3-5-haiku-20241022")
+    AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "4096"))
+    AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))
+
 
 settings = Settings()
