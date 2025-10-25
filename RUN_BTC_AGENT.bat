@@ -8,9 +8,9 @@ echo  ATENCAO: Este agente vai operar com DINHEIRO REAL!
 echo.
 echo  Configuracao:
 echo    - Simbolo: BTCUSDm
-echo    - Volume: 0.02 lots
+echo    - Volume: 0.03 lots
 echo    - Target Profit: $2 por operacao
-echo    - Limite Diario: 20 operacoes
+echo    - Limite Diario: ILIMITADO
 echo    - SL Dinamico: 1.5x ATR
 echo    - Hedge: Automatico em reversao
 echo.
@@ -54,8 +54,8 @@ echo.
 
 timeout /t 3 /nobreak >nul
 
-REM Executar agente com BTCUSDm
-uv run python src\agents\btc_hedge_agent.py BTCUSDm 0.02
+REM Executar agente com BTCUSDm (volume 0.03, sem limite diário)
+uv run python src\agents\btc_hedge_agent.py BTCUSDm 0.03 999
 
 echo.
 echo ============================================================

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Testa se XAUUSDc (Ouro) está disponível e funcionando"""
+"""Testa se XAUUSDm (Ouro) está disponível e funcionando"""
 
 import sys
 from pathlib import Path
@@ -17,11 +17,11 @@ def test_gold_symbol():
 
     mt5 = get_mt5_client()
 
-    # Testar XAUUSDc
-    print("[1] Testando XAUUSDc...")
-    symbol_info = mt5.get_symbol_info("XAUUSDc")
+    # Testar XAUUSDm
+    print("[1] Testando XAUUSDm...")
+    symbol_info = mt5.get_symbol_info("XAUUSDm")
     if symbol_info:
-        print(f"    ✅ XAUUSDc encontrado!")
+        print(f"    ✅ XAUUSDm encontrado!")
         print(f"       Bid: ${symbol_info.get('bid', 0):,.2f}")
         print(f"       Ask: ${symbol_info.get('ask', 0):,.2f}")
         print(f"       Spread: {symbol_info.get('spread', 0)} points")
@@ -29,7 +29,7 @@ def test_gold_symbol():
         print(f"       Volume Max: {symbol_info.get('volume_max', 0)}")
         print(f"       Volume Step: {symbol_info.get('volume_step', 0)}")
     else:
-        print("    ❌ XAUUSDc NÃO encontrado")
+        print("    ❌ XAUUSDm NÃO encontrado")
 
     print()
 
@@ -46,9 +46,9 @@ def test_gold_symbol():
     print()
 
     # Testar rates
-    print("[3] Testando obtenção de rates para XAUUSDc...")
+    print("[3] Testando obtenção de rates para XAUUSDm...")
     rates = mt5.copy_rates_from_pos(
-        symbol="XAUUSDc",
+        symbol="XAUUSDm",
         timeframe="M5",
         start_pos=0,
         count=10
@@ -71,7 +71,7 @@ def test_gold_symbol():
     print()
 
     if symbol_info and rates:
-        print("🎯 XAUUSDc está OK para usar no agente!")
+        print("🎯 XAUUSDm está OK para usar no agente!")
         print()
         print("💡 DICA: Ouro geralmente usa volumes menores que BTC")
         print("   Volume recomendado: 0.01 lots")
@@ -80,8 +80,8 @@ def test_gold_symbol():
         print()
         return True
     else:
-        print("❌ XAUUSDc não está disponível. Verifique:")
-        print("   1. XAUUSDc está no Market Watch do MT5?")
+        print("❌ XAUUSDm não está disponível. Verifique:")
+        print("   1. XAUUSDm está no Market Watch do MT5?")
         print("   2. Adicione o símbolo no MT5")
         return False
 

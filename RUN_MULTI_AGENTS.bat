@@ -7,7 +7,7 @@ echo.
 echo  ATENCAO: Este script vai iniciar 2 agentes simultaneos!
 echo.
 echo  Agente 1: BTCUSDm  (0.02 lots)
-echo  Agente 2: XAUUSDc  (0.01 lots)
+echo  Agente 2: XAUUSDm  (0.01 lots)
 echo.
 echo  Cada agente:
 echo    - Target Profit: $2 por operacao
@@ -63,7 +63,7 @@ start "BTC_AGENT - BTCUSDm" cmd /k "echo AGENTE BTC INICIADO && echo. && uv run 
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente GOLD em janela separada
-start "GOLD_AGENT - XAUUSDc" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDc 0.01"
+start "GOLD_AGENT - XAUUSDm" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDm 0.01"
 
 echo.
 echo ============================================================
@@ -72,7 +72,7 @@ echo ============================================================
 echo.
 echo  Verifique as janelas abertas:
 echo    - BTC_AGENT - BTCUSDm
-echo    - GOLD_AGENT - XAUUSDc
+echo    - GOLD_AGENT - XAUUSDm
 echo.
 echo  Para parar todos os agentes: STOP_ALL_AGENTS.bat
 echo.

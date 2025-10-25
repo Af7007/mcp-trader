@@ -16,7 +16,7 @@ Execute a mesma estratégia de hedge simultaneamente em diferentes símbolos par
 - **ATR Médio**: ~150-300 pontos
 - **Script**: `RUN_BTC_AGENT.bat`
 
-#### 2. Ouro (XAUUSDc)
+#### 2. Ouro (XAUUSDm)
 - **Volume**: 0.01 lots (menor devido ao valor do ouro)
 - **Características**: Volatilidade moderada, safe haven
 - **ATR Médio**: ~0.50-2.00 pontos
@@ -104,9 +104,9 @@ SL: 1.5x ATR (~272 pontos)
 TP: Calculado dinamicamente
 ```
 
-### XAUUSDc (Ouro)
+### XAUUSDm (Ouro)
 ```
-Symbol: XAUUSDc
+Symbol: XAUUSDm
 Volume: 0.01 lots
 Target Profit: $2
 Daily Limit: 20 operações
@@ -177,7 +177,7 @@ uv run python test_btc_symbol.py     # Testa bitcoin
 O mesmo dashboard funciona para **todos os símbolos**!
 
 1. **Para BTC**: Adicione `BTC_Agent_Dashboard.mq5` ao gráfico BTCUSDm
-2. **Para Gold**: Adicione o mesmo dashboard ao gráfico XAUUSDc
+2. **Para Gold**: Adicione o mesmo dashboard ao gráfico XAUUSDm
 
 O dashboard detecta automaticamente qual símbolo está sendo negociado através do arquivo `agent_data.json`.
 
@@ -202,13 +202,13 @@ uv run python ver_trades_banco.py
 ```
 
 O banco mostra:
-- Símbolo de cada trade (BTCUSDm, XAUUSDc, etc.)
+- Símbolo de cada trade (BTCUSDm, XAUUSDm, etc.)
 - Lucros separados
 - Estatísticas consolidadas
 
 **Filtrar por símbolo** (adicionar ao script se necessário):
 ```sql
-SELECT * FROM trades WHERE symbol = 'XAUUSDc'
+SELECT * FROM trades WHERE symbol = 'XAUUSDm'
 ```
 
 ---
@@ -261,7 +261,7 @@ taskkill /F /IM python.exe
 
 **Crypto/Commodities:**
 - BTCUSDm 0.02 lots: ~$2,000 de margem
-- XAUUSDc 0.01 lots: ~$300 de margem
+- XAUUSDm 0.01 lots: ~$300 de margem
 
 **Forex:**
 - GBPUSDc 0.10 lots: ~$130 de margem
@@ -338,7 +338,7 @@ Isso permite dashboards separados para cada símbolo.
 Antes de iniciar múltiplos agentes:
 
 - [ ] MT5 está aberto e logado
-- [ ] Símbolos estão no Market Watch (BTCUSDm, XAUUSDc)
+- [ ] Símbolos estão no Market Watch (BTCUSDm, XAUUSDm)
 - [ ] Margem livre suficiente ($2,500+)
 - [ ] Scripts de teste executados com sucesso
 - [ ] Banco de dados inicializado (`setup_database()`)

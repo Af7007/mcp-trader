@@ -736,17 +736,29 @@ def main():
     # Criar e iniciar agente
     import sys
 
-    # Permitir passar símbolo como argumento
+    # Permitir passar símbolo, volume e limite diário como argumentos
     symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDm"
     volume = float(sys.argv[2]) if len(sys.argv) > 2 else 0.02
+    max_daily_trades = int(sys.argv[3]) if len(sys.argv) > 3 else 20
 
-    logger.info(f"Iniciando com símbolo: {symbol}, volume: {volume}")
+    # Target profit padrão por símbolo
+    target_profit_map = {
+        'BTCUSDm': 2.0,
+        'XAUUSDm': 2.0,  # Ouro
+        'XAUUSDc': 2.0,  # Ouro (alternativa)
+        'GBPUSDc': 2.0,  # Libra
+        'EURUSDc': 2.0,  # Euro
+        'USDJPYc': 2.0,  # Iene
+    }
+    target_profit = target_profit_map.get(symbol, 2.0)
+
+    logger.info(f"Iniciando com símbolo: {symbol}, volume: {volume}, target_profit: ${target_profit}, max_daily_trades: {max_daily_trades}")
 
     agent = BTCHedgeAgent(
         symbol=symbol,
         volume=volume,
-        target_profit=2.0,
-        max_daily_trades=20,
+        target_profit=target_profit,
+        max_daily_trades=max_daily_trades,
         check_interval=30
     )
 

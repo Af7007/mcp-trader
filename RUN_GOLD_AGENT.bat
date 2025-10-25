@@ -7,7 +7,7 @@ echo.
 echo  ATENCAO: Este agente vai operar com DINHEIRO REAL!
 echo.
 echo  Configuracao:
-echo    - Simbolo: XAUUSDc (Ouro)
+echo    - Simbolo: XAUUSDm (Ouro)
 echo    - Volume: 0.01 lots
 echo    - Target Profit: $2 por operacao
 echo    - Limite Diario: 20 operacoes
@@ -54,10 +54,10 @@ echo.
 
 timeout /t 3 /nobreak >nul
 
-REM Executar agente com XAUUSDc
+REM Executar agente com XAUUSDm
 REM Volume ajustado: 0.01 lots (ouro geralmente usa volumes menores)
-title GOLD_AGENT - XAUUSDc
-uv run python src\agents\btc_hedge_agent.py XAUUSDc 0.01
+title GOLD_AGENT - XAUUSDm
+uv run python src\agents\btc_hedge_agent.py XAUUSDm 0.01
 
 echo.
 echo ============================================================
