@@ -5,7 +5,9 @@ Envia notificações de operações, resumos e alertas para um canal do Telegram
 """
 
 import os
+import sys
 import logging
+import asyncio
 import threading
 from typing import Optional, Dict, List
 from datetime import datetime
@@ -50,21 +52,23 @@ class TelegramNotifier:
                 self.enabled = False
 
     def _send_async_safe(self, coro):
-        """Executa uma coroutine em thread separada para evitar bloqueios"""
+        """Executa uma coroutine de forma segura com asyncio"""
         def run_in_thread():
-            import asyncio
             try:
-                # Cria um novo event loop na thread
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(coro)
-                loop.close()
+                # Configurar event loop policy no Windows
+                if sys.platform == 'win32':
+                    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+                # Executar a coroutine
+                asyncio.run(coro)
             except Exception as e:
                 logger.debug(f"Erro ao enviar mensagem async: {e}")
 
         # Roda em thread daemon para não bloquear o agente
         thread = threading.Thread(target=run_in_thread, daemon=True)
         thread.start()
+        # Aguardar um pouco para dar chance de enviar
+        thread.join(timeout=5)
 
     def send_message(self, text: str, parse_mode: str = "HTML") -> bool:
         """
