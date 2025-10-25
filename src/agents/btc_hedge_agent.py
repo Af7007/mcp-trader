@@ -344,27 +344,37 @@ class BTCHedgeAgent:
 
         logger.info(f"📏 SL Distance: ATR={atr:.5f}, Calculado={sl_distance:.5f}, Mínimo={min_sl_distance:.5f}")
 
-        tick_value = symbol_info.get('trade_tick_value', 1)
-        tick_size = symbol_info.get('trade_tick_size', 0.00001)
+        # Obter informações do contrato para cálculo correto do TP
+        contract_size = symbol_info.get('trade_contract_size', 1.0)
+        point = symbol_info.get('point', 0.00001)
 
-        # TP em pontos para atingir target profit
-        if tick_value == 0 or self.volume == 0:
-            logger.error(f"Valores inválidos: tick_value={tick_value}, volume={self.volume}")
+        # TP em pontos de preço para atingir target profit
+        # Fórmula: valor_por_ponto = contract_size * volume
+        # distancia_tp = target_profit / valor_por_ponto
+        if contract_size == 0 or self.volume == 0:
+            logger.error(f"Valores inválidos: contract_size={contract_size}, volume={self.volume}")
             return None
 
-        tp_points = (self.target_profit / (tick_value * self.volume)) * tick_size
+        # Valor em $ de 1 ponto de movimento de preço para o volume atual
+        point_value_for_volume = contract_size * self.volume
+
+        # Distância do TP em pontos de preço
+        tp_distance = self.target_profit / point_value_for_volume
 
         # Garantir TP mínimo também
-        tp_points = max(tp_points, min_sl_distance)
+        tp_distance = max(tp_distance, min_sl_distance)
+
+        logger.info(f"💰 TP Calculation: contract_size={contract_size}, point_value={point_value_for_volume:.5f}, tp_distance={tp_distance:.5f}")
 
         if signal == 'BUY':
             sl = current_price - sl_distance
-            tp = current_price + tp_points
+            tp = current_price + tp_distance
 
             logger.info(f"🔵 Preparando COMPRA:")
             logger.info(f"   Preço: {current_price:.5f}")
             logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
-            logger.info(f"   TP: {tp:.5f} (distância: {tp_points:.5f})")
+            logger.info(f"   TP: {tp:.5f} (distância: {tp_distance:.5f})")
+            logger.info(f"   Lucro esperado: ${self.target_profit:.2f}")
 
             result = self.mt5.buy_market(
                 symbol=self.symbol,
@@ -375,12 +385,13 @@ class BTCHedgeAgent:
             )
         else:  # SELL
             sl = current_price + sl_distance
-            tp = current_price - tp_points
+            tp = current_price - tp_distance
 
             logger.info(f"🔴 Preparando VENDA:")
             logger.info(f"   Preço: {current_price:.5f}")
             logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
-            logger.info(f"   TP: {tp:.5f} (distância: {tp_points:.5f})")
+            logger.info(f"   TP: {tp:.5f} (distância: {tp_distance:.5f})")
+            logger.info(f"   Lucro esperado: ${self.target_profit:.2f}")
 
             result = self.mt5.sell_market(
                 symbol=self.symbol,
