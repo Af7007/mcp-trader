@@ -95,8 +95,8 @@ class BTCHedgeAgent:
         self.original_position_ticket = None
         self.hedge_position_ticket = None
 
-        # SL dinâmico
-        self.atr_multiplier = 1.5
+        # SL dinâmico - Reduzido para melhor R:R
+        self.atr_multiplier = 1.0  # Reduzido de 1.5 para 1.0
 
         logger.info(f"🤖 Agente BTCUSD inicializado")
         logger.info(f"   Symbol: {symbol}")
@@ -108,7 +108,7 @@ class BTCHedgeAgent:
         """Calcula ATR para SL dinâmico."""
         rates = self.mt5.copy_rates_from_pos(
             symbol=self.symbol,
-            timeframe="M5",
+            timeframe="M15",  # Mudado de M5 para M15 para reduzir ruído
             start_pos=0,
             count=periods + 1
         )
@@ -152,7 +152,7 @@ class BTCHedgeAgent:
         """Calcula todos os indicadores disponíveis."""
         rates = self.mt5.copy_rates_from_pos(
             symbol=self.symbol,
-            timeframe="M5",
+            timeframe="M15",  # Mudado de M5 para M15 para reduzir ruído
             start_pos=0,
             count=50
         )
@@ -370,11 +370,17 @@ class BTCHedgeAgent:
             sl = current_price - sl_distance
             tp = current_price + tp_distance
 
+            # Calcular R:R ratio
+            risk_in_price = sl_distance
+            reward_in_price = tp_distance
+            rr_ratio = reward_in_price / risk_in_price if risk_in_price > 0 else 0
+
             logger.info(f"🔵 Preparando COMPRA:")
             logger.info(f"   Preço: {current_price:.5f}")
             logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
             logger.info(f"   TP: {tp:.5f} (distância: {tp_distance:.5f})")
             logger.info(f"   Lucro esperado: ${self.target_profit:.2f}")
+            logger.info(f"   ⚖️  Risk/Reward: 1:{rr_ratio:.2f}")
 
             result = self.mt5.buy_market(
                 symbol=self.symbol,
@@ -387,11 +393,17 @@ class BTCHedgeAgent:
             sl = current_price + sl_distance
             tp = current_price - tp_distance
 
+            # Calcular R:R ratio
+            risk_in_price = sl_distance
+            reward_in_price = tp_distance
+            rr_ratio = reward_in_price / risk_in_price if risk_in_price > 0 else 0
+
             logger.info(f"🔴 Preparando VENDA:")
             logger.info(f"   Preço: {current_price:.5f}")
             logger.info(f"   SL: {sl:.5f} (distância: {sl_distance:.5f})")
             logger.info(f"   TP: {tp:.5f} (distância: {tp_distance:.5f})")
             logger.info(f"   Lucro esperado: ${self.target_profit:.2f}")
+            logger.info(f"   ⚖️  Risk/Reward: 1:{rr_ratio:.2f}")
 
             result = self.mt5.sell_market(
                 symbol=self.symbol,
@@ -817,12 +829,10 @@ class BTCHedgeAgent:
                             self.activate_hedge(pos['ticket'])
 
                 # Abrir nova posição se sinal válido e sem muitas posições
+                # Removido requisito de winning_streak para permitir mais entradas
                 if signal != 'NEUTRAL' and positions_count < 5:
-                    if self.winning_streak >= 2:  # Operações consecutivas em winning streak
-                        logger.info(f"📈 Winning streak: {self.winning_streak} - Abrindo nova posição")
-                        self.open_position(signal, indicators)
-                    elif positions_count == 0:  # Primeira posição
-                        self.open_position(signal, indicators)
+                    logger.info(f"📊 Sinal {signal} detectado - Abrindo posição")
+                    self.open_position(signal, indicators)
 
                 # Aguardar próximo ciclo
                 time.sleep(self.check_interval)
@@ -919,7 +929,7 @@ def main():
 
     # Target profit padrão por símbolo
     target_profit_map = {
-        'BTCUSDm': 2.0,
+        'BTCUSDm': 6.0,  # Aumentado de 2.0 para melhor R:R
         'XAUUSDm': 2.0,  # Ouro
         'XAUUSDc': 2.0,  # Ouro (alternativa)
         'GBPUSDc': 2.0,  # Libra
@@ -935,7 +945,7 @@ def main():
         volume=volume,
         target_profit=target_profit,
         max_daily_trades=max_daily_trades,
-        check_interval=30
+        check_interval=60  # Aumentado de 30s para 60s (M15 requer menos frequência)
     )
 
     # Executar
