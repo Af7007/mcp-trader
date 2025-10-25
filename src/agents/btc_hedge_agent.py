@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.mt5_direct_client import get_mt5_client
 from core.database import setup_database, get_db_connection
+from core.telegram_notifier import get_telegram_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class BTCHedgeAgent:
 
         self.mt5 = get_mt5_client()
         self.state = AgentState.ANALYZING
+        self.telegram = get_telegram_notifier()
 
         # Contadores
         self.daily_trades = 0
@@ -81,6 +83,7 @@ class BTCHedgeAgent:
         self.last_trade_time = None
         self.trades_today = []
         self.open_tickets = set()  # Rastreia tickets de posições abertas
+        self.cycle_count = 0  # Para controlar resumos periódicos
 
         # Configurações de hedge
         self.hedge_active = False
@@ -397,10 +400,41 @@ class BTCHedgeAgent:
             })
 
             logger.info(f"✅ Posição aberta: {signal} | Ticket: {ticket} | SL: {sl:.2f} | TP: {tp:.2f}")
+
+            # 🔔 Notificação Telegram
+            try:
+                self.telegram.send_trade_opened(
+                    ticket=ticket,
+                    symbol=self.symbol,
+                    trade_type=signal,
+                    volume=self.volume,
+                    entry_price=current_price,
+                    tp=tp,
+                    sl=sl,
+                    indicators={
+                        'rsi': indicators.get('rsi', 0),
+                        'macd': indicators.get('macd', 0),
+                        'trend': indicators.get('trend', 'N/A'),
+                        'atr': atr
+                    }
+                )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao enviar notificação Telegram: {e}")
+
             return ticket
         else:
             error = result.get('comment', 'Unknown error') if result else 'No result'
             logger.error(f"❌ Erro ao abrir posição: {error}")
+
+            # 🔔 Notificação de erro no Telegram
+            try:
+                self.telegram.send_error_alert(
+                    error_message=f"Erro ao abrir posição {signal}",
+                    context=error
+                )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao enviar alerta Telegram: {e}")
+
             return None
 
     def activate_hedge(self, original_ticket: int) -> Optional[int]:
@@ -424,6 +458,23 @@ class BTCHedgeAgent:
             self.original_position_ticket = original_ticket
             self.hedge_position_ticket = hedge_ticket
             logger.info(f"✅ Hedge ativado: Original={original_ticket}, Hedge={hedge_ticket}")
+
+            # 🔔 Notificação Telegram - Hedge Ativado
+            try:
+                self.telegram.send_critical_alert(
+                    alert_type="HEDGE",
+                    title="Hedge Ativado",
+                    description=f"Posição em prejuízo. Hedge ativado para defender a posição.",
+                    details={
+                        'Ticket Original': str(original_ticket),
+                        'Ticket Hedge': str(hedge_ticket),
+                        'Prejuízo Atual': f"${position.get('profit', 0):+.2f}",
+                        'Sinal Contrário': opposite_signal,
+                        'Símbolo': self.symbol
+                    }
+                )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao enviar alerta de hedge Telegram: {e}")
 
         return hedge_ticket
 
@@ -497,6 +548,29 @@ class BTCHedgeAgent:
 
                 # Salvar no banco
                 self.save_trade_to_db(ticket, profit, trade_info)
+
+                # 🔔 Notificação Telegram - Posição fechada
+                try:
+                    if trade_info:
+                        self.telegram.send_trade_closed(
+                            ticket=ticket,
+                            symbol=self.symbol,
+                            trade_type=trade_info.get('type', 'UNKNOWN'),
+                            entry_price=trade_info.get('price', 0),
+                            close_price=close_deal.get('price', 0),
+                            profit=profit,
+                            duration_seconds=int((close_deal.get('time', 0) - open_deal.get('time', 0))),
+                            daily_stats={
+                                'total_profit': self.total_profit,
+                                'win_rate': (sum(1 for t in self.trades_today if t.get('profit', 0) > 0) / len(self.trades_today) * 100) if self.trades_today else 0,
+                                'winning_streak': self.winning_streak,
+                                'trades_count': self.daily_trades,
+                                'wins': sum(1 for t in self.trades_today if t.get('profit', 0) > 0),
+                                'losses': sum(1 for t in self.trades_today if t.get('profit', 0) <= 0)
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"⚠️ Erro ao enviar notificação de fechamento Telegram: {e}")
 
                 # Remover do tracking
                 self.open_tickets.discard(ticket)
@@ -620,6 +694,7 @@ class BTCHedgeAgent:
         try:
             while self.state != AgentState.STOPPED:
                 cycle += 1
+                self.cycle_count += 1
 
                 # Reset diário
                 self.check_and_reset_daily_counter()
@@ -644,6 +719,39 @@ class BTCHedgeAgent:
 
                 # EXPORTAR DADOS PARA MT5 DASHBOARD
                 self.export_to_json(indicators, positions)
+
+                # 🔔 Enviar resumo periódico a cada 30 ciclos (~15 minutos com check_interval=30s)
+                if self.cycle_count % 30 == 0:
+                    try:
+                        wins = sum(1 for trade in self.trades_today if trade.get('profit', 0) > 0)
+                        self.telegram.send_periodic_summary(
+                            symbol=self.symbol,
+                            state=self.state.value,
+                            daily_stats={
+                                'total_profit': self.total_profit,
+                                'win_rate': (wins / self.daily_trades * 100) if self.daily_trades > 0 else 0,
+                                'winning_streak': self.winning_streak,
+                                'trades_count': self.daily_trades,
+                                'wins': wins,
+                                'losses': self.daily_trades - wins
+                            },
+                            positions_open=positions_count,
+                            indicators={
+                                'current_price': indicators.get('current_price', 0),
+                                'trend': indicators.get('trend', 'N/A'),
+                                'rsi': indicators.get('rsi', 0),
+                                'macd': indicators.get('macd', 0),
+                                'atr': indicators.get('atr', 0),
+                                'sma_20': indicators.get('sma_20', 0),
+                                'sma_50': indicators.get('sma_50', 0),
+                                'bb_upper': indicators.get('bb_upper', 0),
+                                'bb_middle': indicators.get('bb_middle', 0),
+                                'bb_lower': indicators.get('bb_lower', 0)
+                            },
+                            time_period="últimos 15 minutos"
+                        )
+                    except Exception as e:
+                        logger.error(f"⚠️ Erro ao enviar resumo periódico Telegram: {e}")
 
                 # Verificar se pode operar
                 if self.daily_trades >= self.max_daily_trades:
@@ -680,9 +788,35 @@ class BTCHedgeAgent:
         except KeyboardInterrupt:
             logger.info("\n⚠️  Agente interrompido pelo usuário")
             self.state = AgentState.STOPPED
+
+            # 🔔 Notificação final no Telegram
+            try:
+                self.telegram.send_critical_alert(
+                    alert_type="STOP",
+                    title="Agente Parado",
+                    description=f"Agente de trading {self.symbol} foi parado.",
+                    details={
+                        'Operações Hoje': str(self.daily_trades),
+                        'Lucro Total': f"${self.total_profit:+.2f}",
+                        'Streak': str(self.winning_streak),
+                        'Posições Abertas': str(positions_count) if positions else "0"
+                    }
+                )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao enviar notificação final Telegram: {e}")
+
         except Exception as e:
             logger.error(f"❌ Erro no agente: {e}", exc_info=True)
             self.state = AgentState.STOPPED
+
+            # 🔔 Notificação de erro crítico
+            try:
+                self.telegram.send_error_alert(
+                    error_message=f"Erro crítico no agente {self.symbol}",
+                    context=str(e)
+                )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao enviar alerta de erro Telegram: {e}")
 
     def print_status(self, cycle: int, indicators: Dict, positions: List):
         """Imprime status detalhado."""
