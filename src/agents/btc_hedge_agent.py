@@ -751,8 +751,8 @@ class BTCHedgeAgent:
                     except Exception as e:
                         logger.error(f"⚠️ Erro ao enviar notificação de inicialização: {e}")
 
-                # 🔔 Enviar resumo periódico a cada 10 ciclos (~5 minutos com check_interval=30s)
-                if self.cycle_count % 10 == 0:
+                # 🔔 Enviar resumo periódico a cada 2 ciclos (~1 minuto com check_interval=30s)
+                if self.cycle_count % 2 == 0:
                     try:
                         wins = sum(1 for trade in self.trades_today if trade.get('profit', 0) > 0)
                         self.telegram.send_periodic_summary(
@@ -779,7 +779,7 @@ class BTCHedgeAgent:
                                 'bb_middle': indicators.get('bb_middle', 0),
                                 'bb_lower': indicators.get('bb_lower', 0)
                             },
-                            time_period="últimos 5 minutos"
+                            time_period="último minuto"
                         )
                     except Exception as e:
                         logger.error(f"⚠️ Erro ao enviar resumo periódico Telegram: {e}")
