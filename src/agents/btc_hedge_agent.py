@@ -15,6 +15,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List
 from enum import Enum
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente do .env
+load_dotenv()
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -84,6 +88,7 @@ class BTCHedgeAgent:
         self.trades_today = []
         self.open_tickets = set()  # Rastreia tickets de posições abertas
         self.cycle_count = 0  # Para controlar resumos periódicos
+        self.startup_notified = False  # Flag para enviar notificação de inicialização uma vez
 
         # Configurações de hedge
         self.hedge_active = False
@@ -720,8 +725,34 @@ class BTCHedgeAgent:
                 # EXPORTAR DADOS PARA MT5 DASHBOARD
                 self.export_to_json(indicators, positions)
 
-                # 🔔 Enviar resumo periódico a cada 30 ciclos (~15 minutos com check_interval=30s)
-                if self.cycle_count % 30 == 0:
+                # 🔔 Enviar notificação de inicialização do agente (apenas uma vez)
+                if not self.startup_notified:
+                    try:
+                        signal = self.analyze_signal(indicators)
+                        self.telegram.send_critical_alert(
+                            alert_type="STARTUP",
+                            title=f"🚀 Agente Iniciado - {self.symbol}",
+                            description="Agente de trading iniciado e analisando mercado",
+                            details={
+                                'Volume': f"{self.volume} lots",
+                                'Target Profit': f"${self.target_profit:.2f}",
+                                'Stop Loss': f"1.5× ATR",
+                                'Limite Diário': f"{self.max_daily_trades} operações",
+                                'Preço Atual': f"${indicators.get('current_price', 0):.2f}",
+                                'Tendência': indicators.get('trend', 'N/A'),
+                                'RSI': f"{indicators.get('rsi', 0):.1f}",
+                                'MACD': f"{indicators.get('macd', 0):+.2f}",
+                                'ATR': f"{indicators.get('atr', 0):.2f}",
+                                'Sinal Inicial': signal
+                            }
+                        )
+                        self.startup_notified = True
+                        logger.info("✅ Notificação de inicialização enviada ao Telegram")
+                    except Exception as e:
+                        logger.error(f"⚠️ Erro ao enviar notificação de inicialização: {e}")
+
+                # 🔔 Enviar resumo periódico a cada 10 ciclos (~5 minutos com check_interval=30s)
+                if self.cycle_count % 10 == 0:
                     try:
                         wins = sum(1 for trade in self.trades_today if trade.get('profit', 0) > 0)
                         self.telegram.send_periodic_summary(
@@ -748,7 +779,7 @@ class BTCHedgeAgent:
                                 'bb_middle': indicators.get('bb_middle', 0),
                                 'bb_lower': indicators.get('bb_lower', 0)
                             },
-                            time_period="últimos 15 minutos"
+                            time_period="últimos 5 minutos"
                         )
                     except Exception as e:
                         logger.error(f"⚠️ Erro ao enviar resumo periódico Telegram: {e}")
