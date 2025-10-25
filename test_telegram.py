@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Script para testar integração com Telegram
 Verifica conexão e envia mensagens de teste
 """
 
 import sys
+import os
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Configurar encoding UTF-8 no Windows
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
+# Carregar variáveis do .env
+load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 

@@ -6,11 +6,12 @@ Envia notificações de operações, resumos e alertas para um canal do Telegram
 
 import os
 import logging
+import threading
 from typing import Optional, Dict, List
 from datetime import datetime
 
 try:
-    from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram import Bot
     from telegram.error import TelegramError
     TELEGRAM_AVAILABLE = True
 except ImportError:
@@ -48,6 +49,23 @@ class TelegramNotifier:
                 logger.error(f"❌ Erro ao inicializar Telegram: {e}")
                 self.enabled = False
 
+    def _send_async_safe(self, coro):
+        """Executa uma coroutine em thread separada para evitar bloqueios"""
+        def run_in_thread():
+            import asyncio
+            try:
+                # Cria um novo event loop na thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(coro)
+                loop.close()
+            except Exception as e:
+                logger.debug(f"Erro ao enviar mensagem async: {e}")
+
+        # Roda em thread daemon para não bloquear o agente
+        thread = threading.Thread(target=run_in_thread, daemon=True)
+        thread.start()
+
     def send_message(self, text: str, parse_mode: str = "HTML") -> bool:
         """
         Envia uma mensagem simples para o Telegram.
@@ -63,14 +81,18 @@ class TelegramNotifier:
             return False
 
         try:
-            self.bot.send_message(
+            coro = self.bot.send_message(
                 chat_id=self.chat_id,
                 text=text,
                 parse_mode=parse_mode
             )
+            self._send_async_safe(coro)
             return True
         except TelegramError as e:
             logger.error(f"❌ Erro ao enviar mensagem Telegram: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Erro inesperado ao enviar mensagem: {e}")
             return False
 
     def send_trade_opened(
