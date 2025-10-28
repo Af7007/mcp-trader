@@ -8,7 +8,7 @@ echo  ATENCAO: Este script vai iniciar 5 agentes simultaneos!
 echo.
 echo  Crypto/Commodities:
 echo    1. BTCUSDm  (Bitcoin - 0.02 lots)
-echo    2. XAUUSDm  (Ouro - 0.01 lots)
+echo    2. XAUUSDm  (Ouro - 0.02 lots)
 echo.
 echo  Forex:
 echo    3. GBPUSDc  (Libra - 0.10 lots)
@@ -70,23 +70,23 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Iniciar agente BTC
-start "BTC_AGENT - BTCUSDm" cmd /k "echo AGENTE BTC INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py BTCUSDm 0.02"
+start "BTC_AGENT - BTCUSDm" cmd /k "echo AGENTE BTC INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py BTCUSDm --volume 0.02"
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente GOLD
-start "GOLD_AGENT - XAUUSDm" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDm 0.01"
+start "GOLD_AGENT - XAUUSDm" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDm --volume 0.02"
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente GBP
-start "GBP_AGENT - GBPUSDc" cmd /k "echo AGENTE GBP INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py GBPUSDc 0.10"
+start "GBP_AGENT - GBPUSDc" cmd /k "echo AGENTE GBP INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py GBPUSDc --volume 0.10"
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente EUR
-start "EUR_AGENT - EURUSDc" cmd /k "echo AGENTE EUR INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py EURUSDc 0.10"
+start "EUR_AGENT - EURUSDc" cmd /k "echo AGENTE EUR INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py EURUSDc --volume 0.10"
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente JPY
-start "JPY_AGENT - USDJPYc" cmd /k "echo AGENTE JPY INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py USDJPYc 0.10"
+start "JPY_AGENT - USDJPYc" cmd /k "echo AGENTE JPY INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py USDJPYc --volume 0.10"
 
 echo.
 echo ============================================================
