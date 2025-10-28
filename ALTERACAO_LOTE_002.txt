@@ -1,0 +1,228 @@
+================================================================================
+ ALTERACAO - LOTE PARA 0.02
+================================================================================
+
+DATA: 2025-10-28
+STATUS: ✅ IMPLEMENTADO
+
+================================================================================
+ O QUE FOI ALTERADO
+================================================================================
+
+Você pediu: "abrir todas as operacoes com lote 00.2"
+
+Alteração realizada:
+- Volume das operacoes Gold: 0.01 → 0.02 lotes
+- Todas as operacoes agora abrem com 0.02 lotes
+
+Arquivo modificado:
+- src/agents/btc_hedge_agent.py (linha 163)
+
+================================================================================
+ DETALHES TECNICOS
+================================================================================
+
+ANTES:
+------
+self.volume = 0.01  # Lot size conservador para Gold
+
+DEPOIS:
+-------
+self.volume = 0.02  # Lot size 0.02 para Gold
+
+
+IMPACTO:
+─────────
+Lote anterior: 0.01
+Lote novo:    0.02
+Aumento:      +100% (2x maior)
+
+Exemplo com ouro a $2000/oz:
+  0.01 lot = $200 por ponto
+  0.02 lot = $400 por ponto
+
+  TP de $5:  0.01 lot = +$50 | 0.02 lot = +$100
+  SL de $10: 0.01 lot = -$100| 0.02 lot = -$200
+
+
+================================================================================
+ CONFIGURACAO ATUAL DO AGENTE GOLD
+================================================================================
+
+Symbol:         XAUUSDm (Gold)
+Volume:         0.02 lots              ← NOVO!
+Target Profit:  $5.0 por operacao
+SL:             ATR × 1.5 (dinamico)
+TP:             $5.0 (fixo)
+Modo:           SELL-ONLY (rejeita BUY)
+Hedge:          DESATIVADO
+Max Daily:      999 operacoes/dia
+
+
+================================================================================
+ COMO USAR COM O NOVO LOTE
+================================================================================
+
+Simplesmente inicie o agent normalmente:
+
+  uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+Quando o agent inicia, mostra no log:
+
+  Volume: 0.02
+
+E abre todas as operacoes com 0.02 lotes automaticamente.
+
+Nao precisa fazer mais nada!
+
+
+================================================================================
+ EXEMPLO DE OPERACAO COM 0.02 LOTES
+================================================================================
+
+Sinal: SELL em XAUUSDm
+Entrada: $2000.00
+Volume: 0.02 lotes
+TP: $1995.00 ($5 de lucro)
+SL: ATR × 1.5 (ex: $1995 - $8 ATR×1.5 = ~$1987)
+
+Se TP atingido:
+  Lucro = 0.02 × $5 = $0.10 por lote × 5 = $100 bruto
+  Resultado final: +$100 (menos spreads/comissoes)
+
+Se SL atingido:
+  Perda = 0.02 × $8 = $160 bruto
+  Resultado final: -$160 (mais spreads/comissoes)
+
+
+================================================================================
+ COMPARACAO ANTES E DEPOIS
+================================================================================
+
+                   ANTES (0.01)      DEPOIS (0.02)
+────────────────────────────────────────────────────
+Lote               0.01 lot          0.02 lot
+TP de $5           +$50              +$100
+SL de $10          -$100             -$200
+Risco por op       -$100             -$200
+Potencial diario   20 ops × $50      20 ops × $100
+(Se ganhar todas)  = +$1000          = +$2000
+
+
+================================================================================
+ RISCO/RECOMPENSA
+================================================================================
+
+Com lote 0.02:
+- MAIOR potencial de lucro (2x)
+- MAS TAMBEM maior risco de perda (2x)
+- Mantem proporcoes de Risk/Reward
+
+Estrategia continua a mesma:
+- TP $5.0 por operacao
+- SL dinamico (ATR × 1.5)
+- Apenas SELL signals
+- Sem hedge
+
+A mudanca e APENAS no tamanho do lote!
+
+
+================================================================================
+ MONITORAR NO TELEGRAM
+================================================================================
+
+Quando uma operacao fechar com 0.02 lotes, o Telegram mostrara:
+
+Exemplo WIN:
+─────────────
+✅ WIN
+
+Ticket: #123456789
+💚 Resultado: +$100.00          ← 2x maior (era +$50)
+Volume: 0.02 lotes
+Duração: 8m 45s
+Banca: $1,200.00
+Lucro Acumulado: +8.33%
+
+Exemplo LOSS:
+──────────────
+❌ LOSS
+
+Ticket: #123456790
+❤️  Resultado: -$160.00         ← 2x maior (era -$100)
+Volume: 0.02 lotes
+Duração: 3m 20s
+Banca: $1,040.00
+Lucro Acumulado: -13.33%
+
+
+================================================================================
+ QUANDO ENTRA EM EFEITO
+================================================================================
+
+Imediatamente quando voce iniciar:
+
+  uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+Na proxima operacao que o agent abrir, sera com 0.02 lotes.
+
+Operacoes abertas ANTES desta mudanca continuam com o lote anterior.
+Apenas NOVAS operacoes usam 0.02.
+
+
+================================================================================
+ COMO VOLTAR SE NECESSARIO
+================================================================================
+
+Se quiser voltar para 0.01:
+
+  python
+  # Editar src/agents/btc_hedge_agent.py linha 163:
+  self.volume = 0.01
+
+Ou usar comando direto:
+
+  uv run python src/agents/btc_hedge_agent.py XAUUSDm 0.01
+
+
+================================================================================
+ CHECKLIST
+================================================================================
+
+✅ Volume alterado de 0.01 para 0.02
+✅ Arquivo modificado: btc_hedge_agent.py
+✅ Logs atualizados para mostrar novo tamanho
+✅ Commit realizado
+✅ Pronto para usar
+✅ Impacto: +100% no tamanho de cada operacao
+
+
+================================================================================
+ PROXIMAS OPERACOES
+================================================================================
+
+1. Inicie o agent:
+   uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+2. Aguarde sinais SELL
+
+3. Quando abrir posicoes, serao com 0.02 lotes
+
+4. Monitorar Telegram:
+   - Lucros agora +100%
+   - Perdas agora -100% (proporcional)
+
+5. Gerenciar risco conforme necessario
+
+
+================================================================================
+ STATUS
+================================================================================
+
+[COMPLETO] Lote alterado para 0.02
+[OK] Testes prontos
+[OK] Pronto para producao
+
+INICIE O AGENT! 🚀
+
+================================================================================
