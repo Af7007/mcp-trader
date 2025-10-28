@@ -8,7 +8,7 @@ echo  ATENCAO: Este agente vai operar com DINHEIRO REAL!
 echo.
 echo  Configuracao:
 echo    - Simbolo: XAUUSDm (Ouro)
-echo    - Volume: 0.02 lots
+echo    - Volume: 0.01 lots
 echo    - Target Profit: $5 por operacao
 echo    - Limite Diario: ILIMITADO (24/7)
 echo    - SL Dinamico: ATR x 1.5
@@ -60,10 +60,10 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Executar agente com XAUUSDm
-REM Volume: 0.02 lots
+REM Volume: 0.01 lots (conservador)
 REM Estrategia: SELL-ONLY, Hedge DESATIVADO, SL dinamico (ATR x 1.5)
 title GOLD_AGENT - XAUUSDm
-uv run python src\agents\btc_hedge_agent.py XAUUSDm --volume 0.02
+uv run python src\agents\btc_hedge_agent.py XAUUSDm --volume 0.01
 
 echo.
 echo ============================================================

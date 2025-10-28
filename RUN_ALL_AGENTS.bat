@@ -8,7 +8,7 @@ echo  ATENCAO: Este script vai iniciar 5 agentes simultaneos!
 echo.
 echo  Crypto/Commodities:
 echo    1. BTCUSDm  (Bitcoin - 0.02 lots)
-echo    2. XAUUSDm  (Ouro - 0.02 lots)
+echo    2. XAUUSDm  (Ouro - 0.01 lots)
 echo.
 echo  Forex:
 echo    3. GBPUSDc  (Libra - 0.10 lots)
@@ -74,7 +74,7 @@ start "BTC_AGENT - BTCUSDm" cmd /k "echo AGENTE BTC INICIADO && echo. && uv run 
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente GOLD
-start "GOLD_AGENT - XAUUSDm" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDm --volume 0.02"
+start "GOLD_AGENT - XAUUSDm" cmd /k "echo AGENTE GOLD INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py XAUUSDm --volume 0.01"
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente GBP

@@ -160,14 +160,14 @@ class BTCHedgeAgent:
             # Aumentado TP/SL para serem mais realistas e menos apertados
             self.target_profit = 5.0  # $5.0 por trade (mais realista, menos SL hits)
             self.only_sell = True  # Apenas SELL para Gold (melhor performance)
-            self.volume = 0.02  # Lot size 0.02 para Gold
+            self.volume = 0.01  # Lot size conservador para Gold
             self.hedge_trigger = -10000.0  # DESATIVADO - Foco em ordens acertivas
             self.hedge_tp_target = 1.5  # Não usado (hedge desativado)
             self.atr_multiplier = 1.5  # SL mais aberto para Gold (menos hits)
             logger.info(f"🏆 GOLD MODE ATIVADO - Ordens Acertivas (Hedge DESATIVADO)!")
             logger.info(f"   Target: $5.0 por trade (mais realista)")
             logger.info(f"   Modo: SELL-ONLY (rejeita BUY)")
-            logger.info(f"   Volume: 0.02 lot")
+            logger.info(f"   Volume: 0.01 lot (conservador)")
             logger.info(f"   Hedge: DESATIVADO - Foco em qualidade de entrada")
             logger.info(f"   SL: ATR × 1.5 (espaço real para mercado)")
 
