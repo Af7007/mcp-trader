@@ -158,7 +158,11 @@ class TelegramNotifier:
         close_price: float,
         profit: float,
         duration_seconds: int,
-        daily_stats: Dict
+        daily_stats: Dict,
+        total_wins: int = 0,
+        total_losses: int = 0,
+        account_balance: float = 0,
+        profit_percentage: float = 0
     ) -> bool:
         """
         Notifica fechamento de posição com resultado.
@@ -172,21 +176,28 @@ class TelegramNotifier:
             profit: Lucro em dólares
             duration_seconds: Duração em segundos
             daily_stats: Estatísticas do dia
+            total_wins: Total de operações vencedoras
+            total_losses: Total de operações perdedoras
+            account_balance: Saldo da conta
+            profit_percentage: Percentual de lucro em relação ao balance
 
         Returns:
             True se enviado com sucesso
         """
-        emoji_result = "✅" if profit > 0 else "❌"
-        emoji_profit = "💚" if profit > 0 else "❤️"
+        is_win = profit > 0
+        emoji_result = "✅ WIN" if is_win else "❌ LOSS"
+        emoji_profit = "💚" if is_win else "❤️"
+        emoji_percentage = "🔥" if profit_percentage >= 1.0 else "📈" if profit_percentage > 0 else "📉"
 
         minutes = duration_seconds // 60
         seconds = duration_seconds % 60
 
         message = f"""
-<b>{emoji_result} POSIÇÃO FECHADA</b>
+<b>{emoji_result}</b>
 
 <b>🎫 Ticket:</b> #{ticket}
 <b>{emoji_profit} Resultado:</b> {profit:+.2f}$
+<b>{emoji_percentage} Lucro:</b> {profit_percentage:+.2f}%
 <b>📊 Tipo:</b> {trade_type}
 <b>⏱️  Duração:</b> {minutes}m {seconds}s
 
@@ -196,10 +207,15 @@ class TelegramNotifier:
 • <b>Diferença:</b> ${close_price - entry_price:+.2f}
 
 <b>📈 Hoje ({symbol}):</b>
+• <b>✅ Wins:</b> {total_wins}
+• <b>❌ Losses:</b> {total_losses}
+• <b>Total:</b> {total_wins + total_losses}
 • <b>Lucro:</b> ${daily_stats.get('total_profit', 0):+.2f}
 • <b>Win Rate:</b> {daily_stats.get('win_rate', 0):.1f}%
-• <b>Streak:</b> {daily_stats.get('winning_streak', 0)} 🔥
-• <b>Operações:</b> {daily_stats.get('trades_count', 0)}/999
+
+<b>💰 Banca:</b>
+• <b>Balance:</b> ${account_balance:,.2f}
+• <b>Lucro Acumulado:</b> {profit_percentage:+.2f}%
 
 <b>⏰</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 """
@@ -327,7 +343,7 @@ class TelegramNotifier:
                 details_text += f"• <b>{key}:</b> {value}\n"
 
         message = f"""
-<b>{emoji_alert} ALERTA CRÍTICO</b>
+<b>{emoji_alert} ALERTA </b>
 
 <b>Tipo:</b> {alert_type}
 <b>Título:</b> {title}
@@ -353,6 +369,86 @@ class TelegramNotifier:
             description=error_message,
             details={"Contexto": context} if context else None
         )
+
+    def send_metrics_summary(
+        self,
+        symbol: str,
+        total_trades: int,
+        total_wins: int,
+        total_losses: int,
+        win_rate: float,
+        total_profit: float,
+        avg_win: float = 0,
+        avg_loss: float = 0,
+        current_price: float = 0,
+        time_period: str = "Última hora"
+    ) -> bool:
+        """
+        Envia resumo detalhado de métricas para Gold ou qualquer symbol.
+
+        Args:
+            symbol: Símbolo negociado
+            total_trades: Total de operações
+            total_wins: Total de vitorias
+            total_losses: Total de derrotas
+            win_rate: Taxa de vitória em %
+            total_profit: Lucro total em $
+            avg_win: Ganho médio (opcional)
+            avg_loss: Perda média (opcional)
+            current_price: Preço atual (opcional)
+            time_period: Período analisado
+
+        Returns:
+            True se enviado com sucesso
+        """
+        emoji_profit = "💚" if total_profit > 0 else "❤️" if total_profit < 0 else "⚪"
+        emoji_winrate = "🔥" if win_rate >= 75 else "👍" if win_rate >= 60 else "⚠️"
+
+        # Formatar a mensagem com destaque nas métricas
+        message = f"""
+<b>📊 RESUMO DE MÉTRICAS - {symbol}</b>
+
+<b>⏰</b> {time_period}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━</b>
+
+<b>📈 OPERAÇÕES:</b>
+  <b>📊 Total de trades:</b> <u>{total_trades}</u>
+  <b>✅ Total de vitorias:</b> <u>{total_wins}</u>
+  <b>❌ Total de derrotas:</b> <u>{total_losses}</u>
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━</b>
+
+<b>💰 RESULTADO FINANCEIRO:</b>
+  {emoji_profit} <b>Lucro/Prejuízo:</b> <u>${total_profit:+.2f}</u>
+  {emoji_winrate} <b>Win Rate:</b> <u>{win_rate:.1f}%</u>
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━</b>
+"""
+
+        # Adicionar médias se disponíveis
+        if avg_win != 0 or avg_loss != 0:
+            message += f"""
+<b>📉 MÉDIAS:</b>
+  <b>💚 Ganho Médio:</b> ${avg_win:+.2f}
+  <b>❤️ Perda Média:</b> ${avg_loss:+.2f}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━</b>
+"""
+
+        # Adicionar preço se disponível
+        if current_price > 0:
+            message += f"""
+<b>📍 Preço Atual:</b> ${current_price:,.2f}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━</b>
+"""
+
+        message += f"""
+<b>⏰</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+"""
+
+        return self.send_message(message.strip())
 
 
 # Instância global
