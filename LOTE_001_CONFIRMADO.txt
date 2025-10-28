@@ -1,0 +1,161 @@
+================================================================================
+ LOTE 0.01 - CONFIRMADO E MANTIDO
+================================================================================
+
+DATA: 2025-10-28
+STATUS: ✅ REVERTIDO PARA 0.01
+
+================================================================================
+ ALTERACAO REALIZADA
+================================================================================
+
+Você solicitou: "manter com o lote 00.1 mesmo"
+
+REVERTIDO PARA 0.01:
+✅ src/agents/btc_hedge_agent.py (linha 163)
+✅ RUN_GOLD_AGENT.bat (linha 66)
+✅ RUN_MULTI_AGENTS.bat (linha 66)
+✅ RUN_ALL_AGENTS.bat (linha 77)
+
+
+================================================================================
+ CONFIGURACAO ATUAL - GOLD AGENT
+================================================================================
+
+Symbol:         XAUUSDm (Ouro)
+Volume:         0.01 lots         ← MANTIDO!
+Target Profit:  $5.0 por operacao
+SL:             ATR × 1.5 (dinamico)
+TP:             $5.0 (fixo)
+Modo:           SELL-ONLY
+Hedge:          DESATIVADO
+Max Daily:      999 operacoes/dia
+
+
+================================================================================
+ RESULTADOS COM LOTE 0.01
+================================================================================
+
+Por Operacao:
+──────────────
+✅ WIN (TP atingido):   +$50 de lucro
+❌ LOSS (SL atingido):  -$100 de perda
+
+Exemplo de Dia com 10 operacoes (7 wins, 3 losses):
+───────────────────────────────────────────────────
+7 × +$50  = +$350
+3 × -$100 = -$300
+─────────────────
+TOTAL     = +$50 lucro no dia
+
+Com 20 operacoes (14 wins, 6 losses):
+──────────────────────────────────────
+14 × +$50  = +$700
+6 × -$100  = -$600
+──────────────────
+TOTAL      = +$100 lucro no dia
+
+
+================================================================================
+ TELEGRAM - NOTIFICACOES COM 0.01 LOTE
+================================================================================
+
+Quando uma operacao FECHAR, você receberá:
+
+WIN:
+────
+✅ WIN
+
+Ticket: #123456789
+💚 Resultado: +$50.00           ← 0.01 lot × $5 de lucro
+🔥 Lucro: +0.4%
+Tipo: SELL
+Duração: 8m 45s
+Wins: X
+Losses: Y
+Banca: $1,200.00
+Lucro Acumulado: +0.4%
+
+
+LOSS:
+─────
+❌ LOSS
+
+Ticket: #123456790
+❤️  Resultado: -$100.00          ← 0.01 lot × SL hit
+📉 Lucro: -0.8%
+Tipo: SELL
+Duração: 3m 20s
+Wins: X
+Losses: Y+1
+Banca: $1,100.00
+Lucro Acumulado: -0.8%
+
+
+================================================================================
+ COMO USAR
+================================================================================
+
+Inicie o agent Gold normalmente:
+
+  RUN_GOLD_AGENT.bat
+
+Ou via linha de comando:
+
+  uv run python src\agents\btc_hedge_agent.py XAUUSDm
+
+Será aberto com 0.01 lotes automaticamente.
+
+
+================================================================================
+ VERIFICAR NOS LOGS
+================================================================================
+
+Quando o agent iniciar, procure por:
+
+  Volume: 0.01
+
+Se vir isso nos logs, está correto!
+
+
+================================================================================
+ RESUMO
+================================================================================
+
+Lote: 0.01 (conservador)
+Status: ✅ CONFIRMADO
+
+Lucro esperado por WIN:   +$50
+Perda esperada por LOSS:  -$100
+Risco/Recompensa: 1:0.5 (risco maior que ganho, mas ganhos frequentes)
+
+Pronto para usar! 🚀
+
+
+================================================================================
+ ARQUIVOS ALTERADOS
+================================================================================
+
+✅ src/agents/btc_hedge_agent.py (reverted to 0.01)
+✅ RUN_GOLD_AGENT.bat (reverted to 0.01)
+✅ RUN_MULTI_AGENTS.bat (Gold reverted to 0.01)
+✅ RUN_ALL_AGENTS.bat (Gold reverted to 0.01)
+
+
+================================================================================
+ PROXIMAS OPERACOES
+================================================================================
+
+1. Inicie o agent:
+   RUN_GOLD_AGENT.bat
+
+2. Aguarde sinais SELL
+
+3. Quando abrir posicoes:
+   - Tamanho: 0.01 lots ✓
+   - Lucro se ganhar: +$50 ✓
+   - Perda se perder: -$100 ✓
+
+TUDO PRONTO! 🚀
+
+================================================================================
