@@ -197,7 +197,6 @@ class TelegramNotifier:
 
 <b>🎫 Ticket:</b> #{ticket}
 <b>{emoji_profit} Resultado:</b> {profit:+.2f}$
-<b>{emoji_percentage} Lucro:</b> {profit_percentage:+.2f}%
 <b>📊 Tipo:</b> {trade_type}
 <b>⏱️  Duração:</b> {minutes}m {seconds}s
 
@@ -215,7 +214,7 @@ class TelegramNotifier:
 
 <b>💰 Banca:</b>
 • <b>Balance:</b> ${account_balance:,.2f}
-• <b>Lucro Acumulado:</b> {profit_percentage:+.2f}%
+• <b>{emoji_percentage} Lucro Acumulado:</b> {profit_percentage:+.2f}%
 
 <b>⏰</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 """
