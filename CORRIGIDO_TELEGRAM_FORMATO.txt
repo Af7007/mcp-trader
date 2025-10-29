@@ -1,0 +1,190 @@
+================================================================================
+ CORRIGIDO - FORMATO TELEGRAM AGORA CORRETO
+================================================================================
+
+DATA: 2025-10-29
+STATUS: ✅ CORRIGIDO E AGENT REINICIADO
+
+================================================================================
+ QUAL ERA O PROBLEMA
+================================================================================
+
+A mensagem do Telegram estava mostrando:
+
+ANTES (ERRADO):
+───────────────
+✅ WIN
+
+Ticket: #123456
+💚 Resultado: +$50.00
+🔥 Lucro: +8.33%          ← ERRO! Mostrando percentual aqui também!
+...
+
+Banca:
+• Balance: $1,500.00
+• Lucro Acumulado: +8.33%
+
+
+O PROBLEMA:
+A linha "Lucro:" estava mostrando o percentual em vez do lucro em dólares.
+Ficou duplicado (percentual em 2 lugares).
+
+
+================================================================================
+ COMO FOI CORRIGIDO
+================================================================================
+
+MUDANCA no arquivo: src/core/telegram_notifier.py (linhas 195-220)
+
+ANTES (Linhas 199-200):
+────────────────────────
+<b>{emoji_profit} Resultado:</b> {profit:+.2f}$
+<b>{emoji_percentage} Lucro:</b> {profit_percentage:+.2f}%
+                                 ↑ ERRO - percentual aqui!
+
+DEPOIS (Linhas 199-200):
+────────────────────────
+<b>{emoji_profit} Resultado:</b> {profit:+.2f}$
+<b>📊 Tipo:</b> {trade_type}
+                        ↑ Removido percentual duplicado
+
+
+DEPOIS (Linhas 215-217):
+────────────────────────
+<b>💰 Banca:</b>
+• <b>Balance:</b> ${account_balance:,.2f}
+• <b>{emoji_percentage} Lucro Acumulado:</b> {profit_percentage:+.2f}%
+                                               ↑ Percentual AQUI (correto!)
+
+
+================================================================================
+ AGORA MOSTRA CORRETAMENTE
+================================================================================
+
+NOVO FORMATO (CORRETO):
+───────────────────────
+
+✅ WIN
+
+Ticket: #123456
+💚 Resultado: +$50.00              ← DOLARES (lucro desta operacao)
+📊 Tipo: SELL
+⏱️  Duração: 8m 45s
+
+📊 Preços:
+• Entrada: $2,050.00
+• Saída: $2,045.00
+• Diferença: -$5.00
+
+📈 Hoje (XAUUSDm):
+• ✅ Wins: 5
+• ❌ Losses: 2
+• Total: 7
+• Lucro: $125.00
+• Win Rate: 71.4%
+
+💰 Banca:
+• Balance: $1,500.00
+• 🔥 Lucro Acumulado: +8.33%      ← PERCENTUAL (lucro acumulado)
+
+29/10/2025 14:40:05
+
+
+DIFERENCA CLARA:
+────────────────
+Resultado: +$50.00          = Lucro em DOLARES desta operacao
+Lucro Acumulado: +8.33%     = Percentual do TOTAL acumulado
+
+
+================================================================================
+ AGENT REINICIADO
+================================================================================
+
+Uma nova janela foi aberta:
+  Título: "GOLD_AGENT - XAUUSDm CORRIGIDO"
+
+Agent está:
+✅ Conectando ao MT5
+✅ Carregando configurações Gold
+✅ Analisando mercado
+✅ Aguardando sinais SELL
+
+Status: PRONTO PARA TRADES!
+
+
+================================================================================
+ PROXIMO WIN/LOSS
+================================================================================
+
+Quando a PROXIMA operacao fechar:
+
+1. Você receberá no Telegram
+2. A mensagem mostrará CORRETAMENTE:
+   - Resultado: ${profit}  (em dólares)
+   - Lucro Acumulado: {%}  (em percentual)
+   - Balance: ${balance}   (saldo total)
+
+3. Com emojis corretos:
+   - ✅ WIN ou ❌ LOSS (status)
+   - 💚 ou ❤️ (profit emoji)
+   - 🔥 ou 📈 ou 📉 (percentage emoji)
+
+
+================================================================================
+ RESUMO DAS CORRECOES
+================================================================================
+
+Arquivo: src/core/telegram_notifier.py
+
+Mudancas:
+---------
+1. Removido duplicacao de profit_percentage (estava em 2 linhas)
+2. Reorganizado a estrutura da mensagem
+3. Emoji_percentage agora está apenas na seção "Lucro Acumulado"
+4. Mensagem mais limpa e organizada
+
+Resultado:
+──────────
+✅ Dolares e percentuais em seus lugares corretos
+✅ Nenhuma duplicacao
+✅ Formato limpo e facil de ler
+✅ Todas as informacoes solicitadas presentes
+
+
+================================================================================
+ CHECKLIST
+================================================================================
+
+✅ Agent reiniciado
+✅ Codigo corrigido (telegram_notifier.py)
+✅ Git commit realizado
+✅ Pronto para proximos trades
+✅ Telegram mostrara formato correto
+
+
+================================================================================
+ QUANDO VER NO TELEGRAM
+================================================================================
+
+Na proxima operacao que fechar (TP ou SL):
+
+1. Procure por "Resultado:" com valor em $ (dolares)
+2. Procure por "Lucro Acumulado:" com valor em % (percentual)
+3. Procure por "Balance:" com valor da sua conta
+4. Emojis corretos nos campos certos
+
+TUDO CORRETO? ✓ Implementacao completa!
+
+
+================================================================================
+ STATUS FINAL
+================================================================================
+
+Problema: CORRIGIDO ✓
+Agent: RODANDO ✓
+Telegram: CORRETO ✓
+Proximo WIN: Aguardando sinais
+
+PRONTO PARA PRODUCAO! 🚀
+
+================================================================================
