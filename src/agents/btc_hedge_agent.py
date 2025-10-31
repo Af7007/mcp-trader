@@ -156,19 +156,19 @@ class BTCHedgeAgent:
         # GOLD-SPECIFIC OPTIMIZATIONS
         self.is_gold = 'XAU' in symbol.upper() or 'GOLD' in symbol.upper()
         if self.is_gold:
-            # Otimizacoes para Gold: ORDENS ACERTIVAS sem hedge
+            # Otimizacoes para Gold: ORDENS ACERTIVAS com hedge quando necessario
             # TP reduzido para 4.0 - melhor taxa de acerto
             self.target_profit = 4.0  # $4.0 por trade (TP mais acessivel, maior taxa acerto)
             self.only_sell = True  # Apenas SELL para Gold (melhor performance)
             self.volume = 0.01  # Lot size conservador para Gold
-            self.hedge_trigger = -10000.0  # DESATIVADO - Foco em ordens acertivas
-            self.hedge_tp_target = 1.5  # Não usado (hedge desativado)
+            self.hedge_trigger = -8.0  # ATIVADO - Abre hedge quando perde $8
+            self.hedge_tp_target = 4.0  # Fecha ambas quando hedge ganhar $4 (reduz prejuizo para ~$4)
             self.atr_multiplier = 1.5  # SL mais aberto para Gold (menos hits)
-            logger.info(f"🏆 GOLD MODE ATIVADO - Ordens Acertivas (Hedge DESATIVADO)!")
+            logger.info(f"🏆 GOLD MODE ATIVADO - Ordens Acertivas com Hedge Inteligente!")
             logger.info(f"   Target: $4.0 por trade (mais acessivel)")
             logger.info(f"   Modo: SELL-ONLY (rejeita BUY)")
             logger.info(f"   Volume: 0.01 lot (conservador)")
-            logger.info(f"   Hedge: DESATIVADO - Foco em qualidade de entrada")
+            logger.info(f"   Hedge: ATIVADO - Trigger: -$8.0, TP: +$4.0")
             logger.info(f"   SL: ATR × 1.5 (espaço real para mercado)")
 
         logger.info(f"🤖 Agente inicializado")
