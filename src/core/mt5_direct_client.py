@@ -297,14 +297,18 @@ class MT5Client:
             "volume": volume,
             "type": mt5.ORDER_TYPE_BUY,
             "price": tick.ask,
-            "sl": sl if sl else 0,
-            "tp": tp if tp else 0,
             "deviation": 10,
             "magic": 123456,
             "comment": comment or "",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
+
+        # Adicionar SL e TP apenas se forem especificados
+        if sl and sl > 0:
+            request["sl"] = sl
+        if tp and tp > 0:
+            request["tp"] = tp
 
         result = mt5.order_send(request)
         if result is None:
@@ -345,14 +349,18 @@ class MT5Client:
             "volume": volume,
             "type": mt5.ORDER_TYPE_SELL,
             "price": tick.bid,
-            "sl": sl if sl else 0,
-            "tp": tp if tp else 0,
             "deviation": 10,
             "magic": 123456,
             "comment": comment or "",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
+
+        # Adicionar SL e TP apenas se forem especificados
+        if sl and sl > 0:
+            request["sl"] = sl
+        if tp and tp > 0:
+            request["tp"] = tp
 
         result = mt5.order_send(request)
         if result is None:

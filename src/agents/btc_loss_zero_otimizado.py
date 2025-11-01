@@ -203,13 +203,13 @@ class BTCLossZeroOtimizado:
                 result = self.mt5.sell_market(
                     symbol=self.symbol,
                     volume=self.volume,
-                    comment="Loss Zero - Trailing ilimitado"
+                    comment="LossZero"
                 )
             else:  # BUY
                 result = self.mt5.buy_market(
                     symbol=self.symbol,
                     volume=self.volume,
-                    comment="Loss Zero - Trailing ilimitado"
+                    comment="LossZero"
                 )
 
             # Verificar se ordem foi executada (retcode == 10009 = TRADE_RETCODE_DONE)
