@@ -17,14 +17,14 @@ from agents.btc_loss_zero_otimizado import BTCLossZeroOtimizado
 def main():
     """Executa o agente Loss Zero"""
     print("\n" + "="*70)
-    print("🚀 BTC LOSS ZERO - AGENTE OTIMIZADO")
+    print("BTC LOSS ZERO - AGENTE OTIMIZADO")
     print("="*70)
-    print("\nESTRATÉGIA:")
-    print("✅ Zero Losses - Trailing stop sempre protege")
-    print("✅ Lucros Ilimitados - Sem TP fixo")
-    print("✅ Trailing Dinâmico - Cresce com o preço")
-    print("✅ Automático - Sem intervenção manual")
-    print("\nCONFIGURAÇÃO:")
+    print("\nESTRATEGIA:")
+    print("[OK] Zero Losses - Trailing stop sempre protege")
+    print("[OK] Lucros Ilimitados - Sem TP fixo")
+    print("[OK] Trailing Dinamico - Cresce com o preco")
+    print("[OK] Automatico - Sem intervencao manual")
+    print("\nCONFIGURACAO:")
     print("  Symbol: BTCUSDc")
     print("  Volume: 0.05 lots")
     print("  Trailing Start: 0.5%")
@@ -49,19 +49,19 @@ def main():
 
     except KeyboardInterrupt:
         print("\n" + "="*70)
-        print("⛔ Agente parado pelo usuário")
+        print("Agente parado pelo usuario")
         print("="*70)
         sys.exit(0)
 
     except Exception as e:
         print("\n" + "="*70)
-        print(f"❌ ERRO: {e}")
+        print(f"[ERRO] {e}")
         print("="*70)
-        print("\n⚠️ VERIFIQUE:")
-        print("   1. MetaTrader 5 está aberto?")
-        print("   2. Você está logado na conta?")
-        print("   3. O símbolo BTCUSDc está disponível?")
-        print("   4. Python 3.8+ está instalado?")
+        print("\nVERIFIQUE:")
+        print("   1. MetaTrader 5 esta aberto?")
+        print("   2. Voce esta logado na conta?")
+        print("   3. O simbolo BTCUSDc esta disponivel?")
+        print("   4. Python 3.8+ esta instalado?")
         print("="*70)
         sys.exit(1)
 

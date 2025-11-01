@@ -30,7 +30,7 @@ from typing import Optional, Dict, List
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import MetaTrader5 as mt5
+from core.mt5_direct_client import get_mt5_client
 from core.database import setup_database, get_db_connection
 from core.telegram_notifier import get_telegram_notifier
 
@@ -93,7 +93,7 @@ class BTCLossZeroOtimizado:
         self.total_profit = 0.0
         self.current_win_streak = 0
 
-        logger.info(f"✅ Agente BTC Loss Zero Otimizado inicializado")
+        logger.info(f"[OK] Agente BTC Loss Zero Otimizado inicializado")
         logger.info(f"   Symbol: {self.symbol}")
         logger.info(f"   Volume: {self.volume}")
         logger.info(f"   Trailing: {trailing_start_percent}% → ILIMITADO")
@@ -101,16 +101,15 @@ class BTCLossZeroOtimizado:
 
     def _init_mt5(self):
         """Inicializa conexão com MetaTrader 5"""
-        if not mt5.initialize():
-            raise Exception(f"Falha ao inicializar MT5: {mt5.last_error()}")
-
-        self.mt5 = mt5
-        logger.info("✅ MT5 inicializado com sucesso")
+        self.mt5 = get_mt5_client()
+        if not self.mt5:
+            raise Exception("Falha ao inicializar MT5 client")
+        logger.info("[OK] MT5 inicializado com sucesso")
 
     def run(self):
         """Executa agente Loss Zero continuamente"""
         logger.info("=" * 70)
-        logger.info("🤖 AGENTE BTC LOSS ZERO - TRAILING STOP ILIMITADO")
+        logger.info("[AGENTE] AGENTE BTC LOSS ZERO - TRAILING STOP ILIMITADO")
         logger.info("=" * 70)
         logger.info(f"Estratégia: Zero Losses + Lucros Ilimitados")
         logger.info(f"Pressione Ctrl+C para parar")
@@ -129,8 +128,8 @@ class BTCLossZeroOtimizado:
             logger.info("=" * 70)
             self._print_final_stats()
         except Exception as e:
-            logger.error(f"❌ Erro fatal: {e}")
-            self._notify(f"❌ Agente Loss Zero parado com erro: {e}")
+            logger.error(f"[ERRO] Erro fatal: {e}")
+            self._notify(f"[ERRO] Agente Loss Zero parado com erro: {e}")
 
     def _execute_cycle(self, cycle: int):
         """Executa um ciclo completo de análise e gerenciamento"""
@@ -155,7 +154,7 @@ class BTCLossZeroOtimizado:
             # Obter dados M1
             rates = self.mt5.copy_rates_from_pos(
                 self.symbol,
-                mt5.TIMEFRAME_M1,
+                "M1",
                 0,
                 50
             )
@@ -224,7 +223,7 @@ class BTCLossZeroOtimizado:
                 self.total_trades += 1
 
                 msg = f"""
-🟢 POSIÇÃO ABERTA - Loss Zero
+[ABERTO] POSIÇÃO ABERTA - Loss Zero
 {'='*50}
 Tipo: {signal["type"]}
 Ticket: {self.entry_ticket}
@@ -270,7 +269,7 @@ TP: INFINITO (trailing ilimitado)
             if not self.trailing_active and profit_pct >= self.trailing_start_percent:
                 self.trailing_active = True
                 self.trailing_distance = self.trailing_start_percent
-                msg = f"🚀 TRAILING ATIVADO! Lucro: {profit_pct:.2f}% | Distância: {self.trailing_distance:.2f}%"
+                msg = f"[INICIO] TRAILING ATIVADO! Lucro: {profit_pct:.2f}% | Distância: {self.trailing_distance:.2f}%"
                 logger.info(msg)
                 self._notify(msg)
 
@@ -280,7 +279,7 @@ TP: INFINITO (trailing ilimitado)
                 if profit_pct > self.trailing_distance + self.trailing_increment:
                     old_distance = self.trailing_distance
                     self.trailing_distance = profit_pct - self.trailing_increment
-                    logger.info(f"📈 Trailing atualizado: {old_distance:.2f}% → {self.trailing_distance:.2f}% (Lucro atual: {profit_pct:.2f}%)")
+                    logger.info(f"[SUBIDA] Trailing atualizado: {old_distance:.2f}% → {self.trailing_distance:.2f}% (Lucro atual: {profit_pct:.2f}%)")
 
                 # Verificar se deve fechar (preço caiu abaixo do trailing)
                 if profit_pct < self.trailing_distance * 0.95:  # 5% de tolerância
@@ -304,7 +303,7 @@ TP: INFINITO (trailing ilimitado)
                 self.trailing_active = False
 
                 msg = f"""
-🟢 POSIÇÃO FECHADA COM LUCRO - Trailing Stop
+[ABERTO] POSIÇÃO FECHADA COM LUCRO - Trailing Stop
 {'='*50}
 Ticket: {ticket}
 Tipo: {"BUY" if pos_type == 0 else "SELL"}
@@ -404,7 +403,7 @@ Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
     def _print_final_stats(self):
         """Imprime estatísticas finais"""
         logger.info("\n" + "=" * 70)
-        logger.info("📊 ESTATÍSTICAS FINAIS DO AGENTE LOSS ZERO")
+        logger.info("[STATS] ESTATÍSTICAS FINAIS DO AGENTE LOSS ZERO")
         logger.info("=" * 70)
         logger.info(f"Total de Trades: {self.total_trades}")
         logger.info(f"Trades Lucrativos: {self.profitable_trades}")
@@ -432,8 +431,8 @@ def main():
         agent.run()
 
     except Exception as e:
-        logger.error(f"❌ Erro fatal: {e}")
-        print(f"❌ Erro: {e}")
+        logger.error(f"[ERRO] Erro fatal: {e}")
+        print(f"[ERRO] Erro: {e}")
         print("\nCertifique-se de que:")
         print("1. MetaTrader 5 está aberto")
         print("2. Você está logado na sua conta")
