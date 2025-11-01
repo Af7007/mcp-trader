@@ -60,8 +60,8 @@ class BTCLossZeroOtimizado:
         check_interval: int = 15,
         trailing_start_amount: float = 1.0,  # Ativa com $1 de lucro (NOVO - em dólares)
         trailing_increment_amount: float = 0.5,  # Sobe $0.50 a cada dólar de lucro (NOVO - em dólares)
-        initial_sl_percent: float = 1.5,  # SL de segurança inicial (1.5%)
-        initial_tp_percent: float = 5.0,  # TP de segurança inicial (5%)
+        initial_sl_percent: float = 2.5,  # SL de segurança inicial (2.5% - aumentado)
+        initial_tp_percent: float = 10.0,  # TP de segurança inicial (10% - aumentado)
         use_buy: bool = True,
         use_sell: bool = True
     ):
@@ -150,7 +150,7 @@ class BTCLossZeroOtimizado:
             if not positions:
                 # Sem posições, resetar trailing e analisar para abrir
                 self.trailing_active = False
-                self.trailing_distance = 0.0
+                self.trailing_amount_dollars = 0.0
                 self._analyze_and_open(cycle)
             else:
                 # Tem posição, gerenciar trailing
@@ -246,7 +246,7 @@ class BTCLossZeroOtimizado:
                 self.current_sl = sl  # NOVO: Armazena SL atual
                 self.current_tp = tp  # NOVO: Armazena TP atual
                 self.trailing_active = False
-                self.trailing_distance = 0.0
+                self.trailing_amount_dollars = 0.0
                 self.current_profit_pct = 0.0
                 self.total_trades += 1
 
@@ -260,8 +260,8 @@ Volume: {self.volume}
 Motivo: {signal["reason"]}
 SL Inicial (Segurança): ${sl:.2f} ({self.initial_sl_percent}%)
 TP Inicial (Segurança): ${tp:.2f} ({self.initial_tp_percent}%)
-Trailing: Ativa em {self.trailing_start_percent}% (inativo)
-Estratégia: SL/TP dinâmicos com trailing ilimitado
+Trailing: Ativa em ${self.trailing_start_amount:.2f} em lucro (inativo)
+Estratégia: SL/TP dinâmicos com trailing em dólares
 {'='*50}
 """
                 logger.info(msg)
@@ -425,7 +425,7 @@ SL Atualizado para: ${new_sl:.2f}
 Ticket: {ticket}
 Tipo: {"BUY" if pos_type == 0 else "SELL"}
 Lucro: {profit_pct:.2f}%
-Trailing Ativo: {self.trailing_distance:.2f}%
+Trailing Ativo: ${self.trailing_amount_dollars:.2f}
 Streak: {self.current_win_streak} vitórias consecutivas
 Total Trades: {self.total_trades}
 Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
@@ -619,8 +619,8 @@ def main():
             check_interval=15,
             trailing_start_amount=1.0,     # Ativa com $1 de lucro
             trailing_increment_amount=0.5, # Sobe $0.50 a cada dólar de lucro
-            initial_sl_percent=1.5,        # SL de segurança: 1.5%
-            initial_tp_percent=5.0,        # TP de segurança: 5%
+            initial_sl_percent=2.5,        # SL de segurança: 2.5% (aumentado)
+            initial_tp_percent=10.0,       # TP de segurança: 10% (aumentado)
             use_buy=True,
             use_sell=True
         )
