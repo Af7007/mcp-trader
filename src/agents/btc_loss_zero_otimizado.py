@@ -198,22 +198,25 @@ class BTCLossZeroOtimizado:
             # Fechar posições opostas primeiro
             self._close_opposite_positions(signal["type"])
 
-            # Preparar request
-            request = {
-                "action": mt5.ORDER_TYPE_SELL if signal["type"] == "SELL" else mt5.ORDER_TYPE_BUY,
-                "symbol": self.symbol,
-                "volume": self.volume,
-                "type_filling": mt5.ORDER_FILLING_FOK,
-                "deviation": 10,
-                "comment": "Loss Zero - Trailing ilimitado"
-            }
+            # Usar a API correta: buy_market ou sell_market
+            # SEM TP FIXO - apenas trailing stop
+            if signal["type"] == "SELL":
+                result = self.mt5.sell_market(
+                    symbol=self.symbol,
+                    volume=self.volume,
+                    comment="Loss Zero - Trailing ilimitado"
+                )
+            else:  # BUY
+                result = self.mt5.buy_market(
+                    symbol=self.symbol,
+                    volume=self.volume,
+                    comment="Loss Zero - Trailing ilimitado"
+                )
 
-            # Enviar ordem
-            result = self.mt5.order_send(request)
-
-            if result and result.retcode == mt5.ORDER_RETCODE_DONE:
+            # Verificar se ordem foi executada (retcode == 10009 = TRADE_RETCODE_DONE)
+            if result and result.get('retcode') == 10009:
                 self.entry_price = signal["price"]
-                self.entry_ticket = result.order
+                self.entry_ticket = result.get('order')
                 self.position_type = signal["type"]
                 self.trailing_active = False
                 self.trailing_distance = 0.0
@@ -224,7 +227,7 @@ class BTCLossZeroOtimizado:
 🟢 POSIÇÃO ABERTA - Loss Zero
 {'='*50}
 Tipo: {signal["type"]}
-Ticket: {result.order}
+Ticket: {self.entry_ticket}
 Preço: ${signal["price"]:.2f}
 Volume: {self.volume}
 Motivo: {signal["reason"]}
@@ -237,20 +240,29 @@ TP: INFINITO (trailing ilimitado)
                 self._notify(msg)
             else:
                 logger.error(f"Erro ao abrir posição: {result}")
+                logger.error(f"  Retcode esperado: 10009, recebido: {result.get('retcode') if result else 'None'}")
 
         except Exception as e:
             logger.error(f"Erro ao abrir posição: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _manage_position_trailing(self, pos, cycle: int):
         """Gerencia trailing stop de uma posição"""
         try:
-            current_price = pos.price_current
+            # pos é um dicionário retornado pelo MT5
+            current_price = pos.get('price_current', 0)
+            pos_type = pos.get('type', 0)  # 0 = BUY, 1 = SELL
+            price_open = pos.get('price_open', 0)
+
+            if current_price == 0 or price_open == 0:
+                return
 
             # Calcular lucro percentual
-            if pos.type == mt5.ORDER_TYPE_BUY:
-                profit_pct = ((current_price - pos.price_open) / pos.price_open) * 100
+            if pos_type == 0:  # BUY
+                profit_pct = ((current_price - price_open) / price_open) * 100
             else:  # SELL
-                profit_pct = ((pos.price_open - current_price) / pos.price_open) * 100
+                profit_pct = ((price_open - current_price) / price_open) * 100
 
             self.current_profit_pct = profit_pct
 
@@ -280,9 +292,12 @@ TP: INFINITO (trailing ilimitado)
     def _close_position_with_profit(self, pos, profit_pct: float):
         """Fecha posição com lucro via trailing stop"""
         try:
-            result = self.mt5.position_close(pos.ticket)
+            ticket = pos.get('ticket')
+            pos_type = pos.get('type', 0)
 
-            if result and result.retcode == mt5.ORDER_RETCODE_DONE:
+            result = self.mt5.close_position(ticket)
+
+            if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
                 self.total_profit += profit_pct * self.volume * 100  # Aproximação
                 self.profitable_trades += 1
                 self.current_win_streak += 1
@@ -291,8 +306,8 @@ TP: INFINITO (trailing ilimitado)
                 msg = f"""
 🟢 POSIÇÃO FECHADA COM LUCRO - Trailing Stop
 {'='*50}
-Ticket: {pos.ticket}
-Tipo: {"BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL"}
+Ticket: {ticket}
+Tipo: {"BUY" if pos_type == 0 else "SELL"}
 Lucro: {profit_pct:.2f}%
 Trailing Ativo: {self.trailing_distance:.2f}%
 Streak: {self.current_win_streak} vitórias consecutivas
@@ -316,12 +331,13 @@ Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
                 return
 
             for pos in positions:
-                # Se sinal é SELL e posição é BUY, fechar
-                if signal_type == "SELL" and pos.type == mt5.ORDER_TYPE_BUY:
-                    self.mt5.position_close(pos.ticket)
-                # Se sinal é BUY e posição é SELL, fechar
-                elif signal_type == "BUY" and pos.type == mt5.ORDER_TYPE_SELL:
-                    self.mt5.position_close(pos.ticket)
+                # Posição type: 0 = BUY, 1 = SELL
+                # Se sinal é SELL e posição é BUY (type=0), fechar
+                if signal_type == "SELL" and pos.get('type') == 0:
+                    self.mt5.close_position(pos.get('ticket'))
+                # Se sinal é BUY e posição é SELL (type=1), fechar
+                elif signal_type == "BUY" and pos.get('type') == 1:
+                    self.mt5.close_position(pos.get('ticket'))
 
         except Exception as e:
             logger.error(f"Erro ao fechar posições opostas: {e}")
