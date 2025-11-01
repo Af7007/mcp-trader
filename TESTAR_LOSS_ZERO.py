@@ -130,10 +130,12 @@ def test_agent_init():
         print("  Criando agente...", end=" ")
         agent = BTCLossZeroOtimizado(
             symbol="BTCUSDc",
-            volume=0.05,
+            volume=0.01,
             check_interval=15,
             trailing_start_amount=1.0,
             trailing_increment_amount=0.5,
+            initial_sl_percent=0.036,
+            initial_tp_percent=0.18,
             use_buy=True,
             use_sell=True
         )
@@ -142,6 +144,8 @@ def test_agent_init():
         print("  Validando configuracao:")
         print(f"    Symbol: {agent.symbol}")
         print(f"    Volume: {agent.volume}")
+        print(f"    SL Initial: {agent.initial_sl_percent}% (~$4 loss maximo)")
+        print(f"    TP Initial: {agent.initial_tp_percent}% (1:5 risco/recompensa)")
         print(f"    Trailing Start: ${agent.trailing_start_amount:.2f} em lucro")
         print(f"    Trailing Increment: +${agent.trailing_increment_amount:.2f} por dólar")
         print(f"    BUY/SELL: {'Ativo' if agent.use_buy and agent.use_sell else 'Seletivo'}")

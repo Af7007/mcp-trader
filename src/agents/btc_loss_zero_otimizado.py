@@ -56,12 +56,12 @@ class BTCLossZeroOtimizado:
     def __init__(
         self,
         symbol: str = "BTCUSDc",
-        volume: float = 0.05,
+        volume: float = 0.01,  # Reduzido para 0.01 lotes (menos risco, ~$4 max loss)
         check_interval: int = 15,
         trailing_start_amount: float = 1.0,  # Ativa com $1 de lucro (NOVO - em dólares)
         trailing_increment_amount: float = 0.5,  # Sobe $0.50 a cada dólar de lucro (NOVO - em dólares)
-        initial_sl_percent: float = 2.5,  # SL de segurança inicial (2.5% - aumentado)
-        initial_tp_percent: float = 10.0,  # TP de segurança inicial (10% - aumentado)
+        initial_sl_percent: float = 0.036,  # SL de segurança inicial (0.036% = ~$4 de loss máx)
+        initial_tp_percent: float = 0.18,  # TP de segurança inicial (0.18% = 1:5 risco/recompensa)
         use_buy: bool = True,
         use_sell: bool = True
     ):
@@ -615,12 +615,12 @@ def main():
         # Criar agente Loss Zero com SL/TP dinâmicos e trailing em DÓLARES
         agent = BTCLossZeroOtimizado(
             symbol="BTCUSDc",
-            volume=0.05,
+            volume=0.01,               # Reduzido para menor risco (~$4 max loss)
             check_interval=15,
             trailing_start_amount=1.0,     # Ativa com $1 de lucro
             trailing_increment_amount=0.5, # Sobe $0.50 a cada dólar de lucro
-            initial_sl_percent=2.5,        # SL de segurança: 2.5% (aumentado)
-            initial_tp_percent=10.0,       # TP de segurança: 10% (aumentado)
+            initial_sl_percent=0.036,      # SL apertado: 0.036% (~$4 de loss máx)
+            initial_tp_percent=0.18,       # TP: 0.18% (1:5 risco/recompensa)
             use_buy=True,
             use_sell=True
         )

@@ -27,9 +27,9 @@ def main():
     print("[OK] Automatico - Sem intervencao manual")
     print("\nCONFIGURACAO:")
     print("  Symbol: BTCUSDc")
-    print("  Volume: 0.05 lots")
-    print("  SL Inicial (Seguranca): 1.5%")
-    print("  TP Inicial (Seguranca): 5.0%")
+    print("  Volume: 0.01 lots (reduzido para menor risco)")
+    print("  SL Inicial (Seguranca): 0.036% (~$4 de loss maximo)")
+    print("  TP Inicial (Seguranca): 0.18% (1:5 risco/recompensa)")
     print("  Trailing Start: $1.00 em lucro (DÓLARES)")
     print("  Trailing Increment: +$0.50 a cada dólar (DÓLARES)")
     print("\nPRESSIONE CTRL+C PARA PARAR")
@@ -39,12 +39,12 @@ def main():
         # Criar agente com SL/TP dinâmicos e trailing em DÓLARES
         agent = BTCLossZeroOtimizado(
             symbol="BTCUSDc",
-            volume=0.05,
+            volume=0.01,                   # Reduzido para menor risco (~$4 max loss)
             check_interval=15,
             trailing_start_amount=1.0,     # Ativa com $1 de lucro
             trailing_increment_amount=0.5, # Sobe $0.50 a cada dólar
-            initial_sl_percent=1.5,        # SL de segurança: 1.5%
-            initial_tp_percent=5.0,        # TP de segurança: 5.0%
+            initial_sl_percent=0.036,      # SL apertado: 0.036% (~$4 de loss máx)
+            initial_tp_percent=0.18,       # TP: 0.18% (1:5 risco/recompensa)
             use_buy=True,
             use_sell=True
         )
