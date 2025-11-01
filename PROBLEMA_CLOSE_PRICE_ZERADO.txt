@@ -1,0 +1,168 @@
+================================================================================
+ PROBLEMA IDENTIFICADO: Close Price = Open Price (Todas as trades de hoje)
+================================================================================
+
+DATA: 31/10/2025 - TEMPO: ~10:42 UTC
+STATUS: IDENTIFICADO E SENDO CORRIGIDO
+
+================================================================================
+ O PROBLEMA
+================================================================================
+
+Analise da database mostrou que todas as 13 trades fechadas hoje apresentam:
+- Entry Price = Exit Price (exemplo: $4019.69 → $4019.69)
+- Profit = $0.00 (todas marcadas como LOSS)
+- Nenhum trade com lucro/prejuizo calculado
+
+Exemplo de 3 trades:
+1. Ticket #254570024 - $4019.69 → $4019.69 = $0.00 (0%)
+2. Ticket #254540115 - $4005.76 → $4005.76 = $0.00 (0%)
+3. Ticket #254538260 - $4010.40 → $4010.40 = $0.00 (0%)
+
+================================================================================
+ CAUSA RAIZ
+================================================================================
+
+Arquivo: src/agents/btc_hedge_agent.py
+Linha: 1131
+
+Codigo problemático:
+────────────────────────────────────────
+    close_price = trade_info.get('close_price', open_price)
+────────────────────────────────────────
+
+PROBLEMA:
+- A dictionary `trade_info` é criada quando a trade é ABERTA
+- Ela contém: ticket, price (entrada), sl, tp, time, etc
+- Ela NÃO contém: close_price (porque ainda não foi fechada)
+- Quando se tenta recuperar com .get('close_price', open_price)
+- Como close_price não existe, volta para open_price
+- Resultado: entry price = exit price = $0.00 profit
+
+FLUXO INCORRETO:
+1. Trade é aberta
+2. trade_info = {'ticket': XXX, 'price': $4019.69, 'sl': $X, 'tp': $Y}
+3. Trade fecha
+4. close_price não está em trade_info
+5. close_price = open_price (fallback)
+6. Salva como: entry=$4019.69, exit=$4019.69, profit=$0.00
+
+================================================================================
+ A SOLUÇÃO
+================================================================================
+
+O close_deal DO MT5 já contém o preço de saída!
+
+Na função save_trade_to_db (linha 1070):
+─────────────────────────────────────────
+
+LINHA 1093-1098 já recupera deals:
+    if deals and len(deals) >= 2:
+        open_deal = deals[0]
+        close_deal = deals[-1]
+
+        open_price = open_deal.get('price', 0)
+        close_price = close_deal.get('price', 0)  ← AQUI JÁ TEM O PRICE!
+
+PROBLEMA: Depois na linha 1131, se trade_info existir, SUBSTITUI o close_price:
+    if trade_info:
+        ...
+        close_price = trade_info.get('close_price', open_price)  ← ERRADO!
+
+SOLUÇÃO:
+Remover a linha 1131 que sobrescreve close_price, ou:
+Mudar para NÃO sobrescrever se close_deal já tem o price
+
+================================================================================
+ CODIGO CORRETO (FIX)
+================================================================================
+
+Mudar a lógica em save_trade_to_db para:
+
+1. Priorizar dados de deals (vêm do MT5 com preços reais)
+2. Usar trade_info apenas para dados que deals não tem
+3. NÃO sobrescrever close_price se já veio de deals
+
+OPCAO A - SIMPLIFICAR (Recomendado):
+──────────────────────────────────────
+
+    if deals and len(deals) >= 2:
+        open_deal = deals[0]
+        close_deal = deals[-1]
+
+        open_price = open_deal.get('price', 0)
+        close_price = close_deal.get('price', 0)  # ← USA REAL DO MT5
+        volume = open_deal.get('volume', 0) or self.volume
+
+        # Se trade_info existe, usa para preencher SL/TP apenas
+        if trade_info:
+            sl = trade_info.get('sl', sl)
+            tp = trade_info.get('tp', tp)
+            trade_type = trade_info.get('type', 'UNKNOWN')
+
+        # NÃO sobrescrever close_price!
+
+    else:
+        # Fallback se não tiver deals: usar trade_info
+        if trade_info:
+            open_price = trade_info.get('price', 0)
+            close_price = trade_info.get('close_price', open_price)
+            ...
+
+OPCAO B - MANTER FALLBACK MAS CORRIGIR:
+─────────────────────────────────────────
+
+Remover linha 1131 completamente
+Se deals tem close_deal.price, usar
+Se não, deixar como 0 em vez de open_price
+
+================================================================================
+ IMPACTO DO PROBLEMA
+================================================================================
+
+Dados QUEBRADOS de hoje:
+- 13 trades com entry = exit
+- Todos com profit = $0.00
+- Impede análise correta de performance
+- Telegram mostra resultados incorretos
+
+URGENCIA: ALTA
+- Agent está rodando com code quebrado
+- Todas as trades de hoje estão salvas incorretamente
+- Próximas trades também serão salvas incorretamente
+
+================================================================================
+ ACAO NECESSARIA
+================================================================================
+
+1. Aplicar fix na função save_trade_to_db (linha 1093-1145)
+2. Priorizar dados de close_deal sobre trade_info
+3. Reiniciar agent com novo código
+4. (OPCIONAL) Limpar trades de hoje e re-executar análise
+
+================================================================================
+ VERIFICACAO
+================================================================================
+
+Após fix:
+1. Rodar novo trade manualmente
+2. Verificar se close_price != open_price
+3. Verificar se profit != $0.00
+4. Confirmar database mostra valores corretos
+
+SELECT ticket, open_price, close_price, profit
+FROM trades
+WHERE DATE(close_time) = DATE('now')
+LIMIT 5;
+
+Esperado ANTES (ERRADO):
+ticket | open_price | close_price | profit
+───────┼────────────┼─────────────┼───────
+  254570024 | 4019.69    | 4019.69     | 0.00
+
+Esperado DEPOIS (CORRETO):
+ticket | open_price | close_price | profit
+───────┼────────────┼─────────────┼───────
+  254570024 | 4019.69    | 4023.40     | 40.00  (ou outro valor real)
+
+================================================================================

@@ -14,7 +14,7 @@ O **Agent Generator** cria agentes de trading a partir de **linguagem natural**.
 ```
 
 **Resultado:**
-- ✅ Símbolo: XAUUSDc
+- ✅ Símbolo: XAUUSDm
 - ✅ Indicador: RSI
 - ✅ Take Profit: $3.00
 - ✅ Stop Loss: $1.00
@@ -163,8 +163,8 @@ config = generator.export_agent(agent.id)
 @dataclass
 class AgentConfig:
     id: str                          # ID único (ex: "5091b3c6")
-    name: str                        # Nome (ex: "XAUUSDc_RSI_20251022_172910")
-    symbol: str                      # Símbolo (ex: "XAUUSDc")
+    name: str                        # Nome (ex: "XAUUSDm_RSI_20251022_172910")
+    symbol: str                      # Símbolo (ex: "XAUUSDm")
     order_type: OrderType            # BUY, SELL, ou BUY_SELL
     volume: float                    # Volume em lots (ex: 0.1)
     indicators: List[Indicator]      # Lista de indicadores

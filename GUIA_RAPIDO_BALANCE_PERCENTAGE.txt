@@ -1,0 +1,181 @@
+================================================================================
+ GUIA RAPIDO - BALANCE E PROFIT PERCENTAGE
+================================================================================
+
+IMPLEMENTACAO: ✅ 100% COMPLETO
+
+================================================================================
+ O QUE FOI IMPLEMENTADO
+================================================================================
+
+Você pediu:
+"Incluir tambem nas msg o valor total da banca e a porcentagem do lucro
+total referente aos WINS e quando LOSS exibir a porcentagem tambem"
+
+Implementado:
+✅ Cada mensagem WIN/LOSS agora mostra:
+   1. Balance total da conta (ex: $1,250.00)
+   2. Profit percentage acumulado (ex: +2.20%)
+   3. Emoji inteligente: 🔥 (>=1%), 📈 (>0%), 📉 (<=0%)
+
+================================================================================
+ COMO USAR
+================================================================================
+
+1. Inicie o agent Gold normalmente:
+
+   uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+2. Quando um trade fechar (TP ou SL), você receberá no Telegram:
+
+   ┌─────────────────────────────────────┐
+   │ ✅ WIN                              │
+   │                                     │
+   │ Ticket: #125967293                  │
+   │ 💚 Resultado: +$5.00                │
+   │ 🔥 Lucro: +2.20%                   │ <- NOVO!
+   │ ...                                 │
+   │ Wins: 5                             │
+   │ Losses: 2                           │
+   │ ...                                 │
+   │ Banca:                              │ <- NOVO!
+   │ • Balance: $1,250.00                │
+   │ • Lucro Acumulado: +2.20%           │
+   │ ...                                 │
+   └─────────────────────────────────────┘
+
+3. Pronto! O agent já faz tudo automaticamente.
+
+================================================================================
+ EXEMPLOS DE MENSAGENS
+================================================================================
+
+EXEMPLO 1: WIN com Profit baixo
+─────────────────────────────────
+Banca:
+• Balance: $1,000.00
+• Lucro Acumulado: +0.50%  (emoji 📈)
+
+
+EXEMPLO 2: WIN com Profit bom
+──────────────────────────────
+Banca:
+• Balance: $1,000.00
+• Lucro Acumulado: +2.00%  (emoji 🔥)
+
+
+EXEMPLO 3: LOSS mas ainda positivo no geral
+─────────────────────────────────────────────
+Banca:
+• Balance: $1,000.00
+• Lucro Acumulado: +1.50%  (emoji 📈)
+
+
+EXEMPLO 4: LOSS e negativo
+───────────────────────────
+Banca:
+• Balance: $1,000.00
+• Lucro Acumulado: -0.50%  (emoji 📉)
+
+
+================================================================================
+ COMO FUNCIONA INTERNAMENTE
+================================================================================
+
+Quando um trade fecha:
+
+1. Agent obtém balance da conta MT5:
+   account_balance = $1,250.00
+
+2. Agent calcula percentual:
+   profit_percentage = (total_profit / balance) * 100
+                     = ($27.50 / $1,250.00) * 100
+                     = 2.20%
+
+3. Agent envia para Telegram com ambos valores
+
+4. Você recebe mensagem formatada com os 2 novos campos
+
+
+================================================================================
+ TESTAR FUNCIONAMENTO
+================================================================================
+
+Teste rapido (sem precisar de trades reais):
+
+   python test_telegram_balance_percent.py
+
+Resultado esperado:
+   [OK] WIN enviado com sucesso!
+   [OK] LOSS enviado com sucesso!
+   [OK] WIN com HIGH % enviado com sucesso!
+   [OK] LOSS enviado com sucesso!
+
+   [SUCESSO] 4 mensagens enviadas com sucesso!
+
+
+================================================================================
+ PERGUNTAS FREQUENTES
+================================================================================
+
+P: Por que o percentual mudou entre mensagens?
+R: Porque a cada trade que fecha, o total_profit muda. Ex:
+   - Depois de +$10: 1.0% de $1000
+   - Depois de +$20: 2.0% de $1000
+   - Depois de +$15 (SL): 1.5% de $1000
+
+P: E se a banca diminuir durante o dia?
+R: O percentual é sempre calculado sobre o balance atual:
+   - Banca $1000, Lucro $20 = +2.0%
+   - Banca diminui para $995 (outro agente/operacao), Lucro $20 = +2.01%
+
+P: Quando aparece 🔥?
+R: Quando o profit percentage >= 1.0%
+   - +1.00% → 🔥
+   - +1.50% → 🔥
+   - +2.00% → 🔥
+
+P: Quando aparece 📈?
+R: Quando o profit percentage > 0% MAS < 1.0%
+   - +0.10% → 📈
+   - +0.50% → 📈
+   - +0.99% → 📈
+
+P: Quando aparece 📉?
+R: Quando o profit percentage <= 0%
+   - -1.00% → 📉
+   - -0.50% → 📉
+   -  0.00% → 📉
+
+
+================================================================================
+ CHECKLIST
+================================================================================
+
+✅ Balance mostrando corretamente
+✅ Profit percentage calculado corretamente
+✅ Emoji inteligente funcionando
+✅ Teste realizado: 4/4 mensagens OK
+✅ Agent rodando e pronto para usar
+✅ Commits salvos em git
+
+Status: 🚀 PRONTO PARA PRODUCAO!
+
+
+================================================================================
+ PROXIMA ACAO
+================================================================================
+
+Inicie o agent e deixe rodando:
+
+   uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+Quando trades fecharem, você verá no Telegram:
+- Balance atualizado
+- Profit percentage atualizado
+- Emoji correto
+- Wins/Losses count
+
+Tudo funcionando perfeitamente! 🚀
+
+================================================================================

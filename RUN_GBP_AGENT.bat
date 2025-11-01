@@ -55,8 +55,9 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Executar agente com GBPUSDc
+REM Volume ajustado: 0.10 lots (forex usa volumes maiores)
 title GBP_AGENT - GBPUSDc
-uv run python src\agents\btc_hedge_agent.py GBPUSDc 0.10
+uv run python src\agents\btc_hedge_agent.py GBPUSDc --volume 0.10
 
 echo.
 echo ============================================================

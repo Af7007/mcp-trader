@@ -1,0 +1,60 @@
+================================================================================
+  CHECKLIST RAPIDO: TELEGRAM ESTA FUNCIONANDO?
+================================================================================
+
+NOTIFICACOES JA EXISTENTES - NADA A FAZER:
+  ✅ Quando SELL abre → notificação com ticket, TP, SL, indicadores
+  ✅ Quando trade fecha → notificação com resultado e stats do dia
+  ✅ A cada minuto → resumo simples (estado, posições, lucro)
+  ✅ Quando hedge ativa → alerta crítico
+  ✅ Se erro ocorre → alerta de erro
+
+NOVO ADICIONADO:
+  ✅ A cada 5 trades → resumo detalhado de métricas com:
+     [ ] Total de trades
+     [ ] Total de vitorias
+     [ ] Total de derrotas
+     [ ] Win rate (%)
+     [ ] Lucro/prejuizo ($)
+     [ ] Ganho/perda média
+     [ ] Preço atual
+     [ ] Emojis visuais
+
+================================================================================
+  CONFIGURAR TELEGRAM (2 MINUTOS)
+================================================================================
+
+1. Abra Telegram → procure @BotFather → /newbot → copie TOKEN
+
+2. Copie este TOKEN no .env:
+   TELEGRAM_BOT_TOKEN=seu_token_aqui
+
+3. Crie grupo no Telegram, convide seu bot, envie mensagem
+
+4. Acesse: https://api.telegram.org/bot{SEU_TOKEN}/getUpdates
+   Copie o chat ID (número com "-" na frente)
+
+5. Copie no .env:
+   TELEGRAM_CHAT_ID=seu_chat_id_aqui
+
+6. Certifique-se de:
+   TELEGRAM_ENABLED=true
+
+================================================================================
+  TESTAR
+================================================================================
+
+  python test_telegram.py
+  (deve enviar mensagem de teste)
+
+  Depois:
+  uv run python src/agents/btc_hedge_agent.py XAUUSDm
+  (deve enviar notificações ao abrir SELL)
+
+================================================================================
+  PRONTO!
+================================================================================
+
+Tudo foi implementado. Agora é só configurar os tokens do Telegram no .env
+e começar a receber notificações!
+

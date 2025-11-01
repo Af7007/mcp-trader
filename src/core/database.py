@@ -30,20 +30,23 @@ def setup_database():
         cursor = conn.cursor()
 
         # Tabela para armazenar trades iniciados pela IA ou comandos
+        # Schema compatível com btc_hedge_agent.py
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticket INTEGER UNIQUE,
                 symbol TEXT NOT NULL,
+                type TEXT NOT NULL,  -- 'BUY' ou 'SELL'
                 volume REAL NOT NULL,
-                entry_price REAL NOT NULL,
-                sl_price REAL,
-                tp_price REAL,
-                status TEXT NOT NULL DEFAULT 'open', -- 'open', 'closed'
-                result REAL, -- Lucro/Prejuízo
+                open_price REAL NOT NULL,
+                close_price REAL,
                 open_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 close_time TIMESTAMP,
-                reason TEXT -- 'tp', 'sl', 'manual', 'worker'
+                sl REAL,  -- Stop Loss
+                tp REAL,  -- Take Profit
+                profit REAL,  -- Lucro/Prejuízo
+                comment TEXT,  -- Comentário/identificação do trade
+                status TEXT NOT NULL DEFAULT 'open'  -- 'open', 'closed'
             );
         """)
 

@@ -1,0 +1,180 @@
+================================================================================
+  ANALISE DETALHADA DOS LOSSES - PROBLEMAS IDENTIFICADOS
+================================================================================
+
+ANALISANDO OS 50 ULTIMOS TRADES:
+
+RESULTADO GERAL:
+  - Vitórias: 30 (60.0%)
+  - Derrotas: 20 (40.0%)
+  - Lucro Total: -$28.12 (PREJUIZO!)
+  - Lucro Médio (Winners): $4.55
+  - Prejuízo Médio (Losers): -$8.23
+
+================================================================================
+  PROBLEMA #1: BUY é muito pior que SELL (CRÍTICO!)
+================================================================================
+
+PERFORMANCE BUY vs SELL:
+
+  BUY:
+    - Total: 14 trades
+    - Vitórias: 5 (35.7%)  ← MUITO BAIXO!
+    - Derrotas: 9 (64.3%)  ← CRÍTICO!
+    - Lucro: -$73.05 (PREJUIZO MASSIVO)
+    - Média: -$5.22 por trade
+
+  SELL:
+    - Total: 36 trades
+    - Vitórias: 25 (69.4%)
+    - Derrotas: 11 (30.6%)
+    - Lucro: +$44.93 (LUCRATIVO)
+    - Média: +$1.25 por trade
+
+CONCLUSAO: A estratégia SELL está funcionando bem (69.4% de acerto),
+mas BUY está FALHANDO (apenas 35.7% de acerto). O agente deveria
+estar fazendo mais SELL e menos BUY, ou parar de fazer BUY.
+
+================================================================================
+  PROBLEMA #2: XAUUSDm (Gold) tem desempenho ruim
+================================================================================
+
+PERFORMANCE POR SÍMBOLO (50 últimos):
+
+  BTCUSDm:
+    - 31 trades
+    - Win Rate: 64.5%
+    - Lucro: +$7.51 ✓
+
+  XAUUSDm:
+    - 19 trades
+    - Win Rate: 52.6%  ← RUIM!
+    - Lucro: -$35.63 (PREJUIZO!)  ← CRÍTICO!
+    - Média: -$1.88 por trade
+
+CONCLUSAO: XAUUSDm está PERDENDO DINHEIRO. Contribuiu com -$35.63
+dos -$28.12 de prejuízo total nos últimos 50 trades.
+
+================================================================================
+  PROBLEMA #3: SL/TP ZERADOS! (MUITO GRAVE!)
+================================================================================
+
+OBSERVACAO CRÍTICA:
+
+Todos os últimos trades mostram:
+  SL: $0.00
+  TP: $0.00
+
+Isso significa que O AGENTE NAO ESTA USANDO STOP LOSS E TAKE PROFIT!
+
+Exemplos:
+  - Ticket 125980536 | SELL BTC | $114706 > $115280 | -$573.96 em movimento | -$11.48 prejuízo
+    (Se tivesse SL, teria fechado antes da grande queda)
+
+  - Ticket 125859626 | BUY GOLD | $4083.65 > $4064.86 | -$18.79 em movimento | -$18.79 prejuízo
+    (Se tivesse TP, teria fechado ao atingir alvo)
+
+PROBLEMA: Sem SL/TP, os trades ficam abertos deixando o preço se
+afastar demais da entrada, causando grandes prejuízos.
+
+================================================================================
+  PROBLEMA #4: Grande diferença entre ganhos e perdas
+================================================================================
+
+ANALISE FINANCEIRA:
+
+  Lucro Médio (Winners): $4.55
+  Prejuízo Médio (Losers): -$8.23
+  Razão: 0.55:1 (RUIM!)
+
+Interpretação:
+  - Quando ganha, ganha pouco ($4.55)
+  - Quando perde, perde muito (-$8.23)
+
+Isso explica por que mesmo com 60% de acerto, o resultado é negativo!
+
+Fórmula de lucro:
+  Lucro = (Wins × $4.55) + (Losses × -$8.23)
+  Lucro = (30 × $4.55) + (20 × -$8.23)
+  Lucro = $136.50 - $164.60 = -$28.10 ✓
+
+================================================================================
+  PROBLEMA #5: Maiores losses estão concentrados em XAUUSDm
+================================================================================
+
+TOP 5 MAIORES LOSSES:
+
+1. Ticket 114600602 | UNKNOWN | -$1921.05  (DADOS CORROMPIDOS)
+2. Ticket 118535063 | GOLD BUY | -$1271.67 (Movimento: -0.93%)
+3. Ticket 118218481 | GOLD SELL | -$812.78 (Movimento: -0.70%)
+4. Ticket 117462353 | GOLD SELL | -$608.67 (Movimento: -0.48%)
+5. Ticket 115145277 | GOLD BUY | -$267.84 (Movimento: -0.41%)
+
+4 dos 5 maiores losses são em GOLD (XAUUSDm)!
+Esses 4 prejuízos somam: -$2,960.96
+
+CONCLUSAO: O agente está tendo GRANDES PREJUIZOS em ouro. Precisa
+parar de tradear GOLD ou mudar completamente a estratégia.
+
+================================================================================
+  RESUMO DOS PROBLEMAS ENCONTRADOS
+================================================================================
+
+CRITICO (Necessário corrigir URGENTEMENTE):
+  1. SL/TP ZERADOS - Agente não está usando stop loss e take profit
+  2. BUY tem apenas 35.7% de acerto - Estratégia de BUY está quebrada
+  3. XAUUSDm perdeu $35.63 nos últimos 50 trades - Deve parar de operar
+
+IMPORTANTE:
+  4. Razão Win/Loss de 0.55:1 - Ganhos muito menores que perdas
+  5. Lucro médio $4.55 vs Prejuízo médio $8.23 - Desfavorável
+
+================================================================================
+  RECOMENDACOES URGENTES
+================================================================================
+
+1. VERIFICAR POR QUE SL/TP ESTAO ZERADOS
+   - Agente não está calculando SL/TP corretamente
+   - Ou está fechando posições antes de poder salvar SL/TP
+   - Verifique src/agents/btc_hedge_agent.py linhas 600-800
+
+2. DESABILITAR BUY OU REPARAR
+   - BUY tem taxa de acerto de apenas 35.7%
+   - SELL tem 69.4% de acerto
+   - Considere remover BUY da estratégia ou investigar o motivo
+
+3. PARAR DE TRADEAR XAUUSDm
+   - Perdendo dinheiro consistentemente
+   - 52.6% de acerto é insuficiente
+   - Recomendação: Desabilite GOLD até corrigir
+
+4. AUMENTAR TARGET PROFIT
+   - Ganhos médios são muito pequenos ($4.55)
+   - Prejuízos médios são muito grandes ($8.23)
+   - Aumente TP para capturar mais lucro por trade
+
+5. IMPLEMENTAR SL/TP CORRETOS
+   - Todos os trades mostram SL=$0 e TP=$0
+   - Isso deixa as posições vulneráveis
+   - Implementar SL com ATR multiplier
+   - Implementar TP com target profit fixo
+
+================================================================================
+  PROXIMOS PASSOS
+================================================================================
+
+1. Investigue o código do agente - por que SL/TP estão zerados?
+2. Teste estratégia com apenas SELL (sem BUY)
+3. Teste com apenas BTCUSDm e EURUSDc (remove GOLD)
+4. Aumente target profit de $2 para $5-10
+5. Verifique se SL/TP estão sendo calculados e salvos corretamente
+
+================================================================================
+  STATUS: INVESTIGACAO NECESSARIA
+================================================================================
+
+O agente estava funcionando, mas existem 3 problemas críticos que
+precisam ser corrigidos para parar de perder dinheiro.
+
+Prioridade: ALTA
+Data: 2025-10-27

@@ -50,7 +50,7 @@ fechar tudo
 ```
 💬 Você: posições
    ✅ 2 posição(ões):
-      • XAUUSDc: 0.1 @ 4102.50
+      • XAUUSDm: 0.1 @ 4102.50
       • EURUSDc: 0.05 @ 1.16100
 
 💬 Você: fechar 105654221

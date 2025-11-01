@@ -124,7 +124,7 @@ def check_system():
     logger.info("6️⃣  CHECK SYMBOLS")
     logger.info("=" * 60)
     
-    symbols = ["XAUUSDc", "EURUSDc", "GBPUSDc"]
+    symbols = ["XAUUSDm", "EURUSDc", "GBPUSDc"]
     for symbol in symbols:
         info = mt5.symbol_info(symbol)
         if info:

@@ -60,17 +60,17 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Iniciar agente GBP em janela separada
-start "GBP_AGENT - GBPUSDc" cmd /k "echo AGENTE GBP INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py GBPUSDc 0.10"
+start "GBP_AGENT - GBPUSDc" cmd /k "echo AGENTE GBP INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py GBPUSDc --volume 0.10"
 
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente EUR em janela separada
-start "EUR_AGENT - EURUSDc" cmd /k "echo AGENTE EUR INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py EURUSDc 0.10"
+start "EUR_AGENT - EURUSDc" cmd /k "echo AGENTE EUR INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py EURUSDc --volume 0.10"
 
 timeout /t 2 /nobreak >nul
 
 REM Iniciar agente JPY em janela separada
-start "JPY_AGENT - USDJPYc" cmd /k "echo AGENTE JPY INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py USDJPYc 0.10"
+start "JPY_AGENT - USDJPYc" cmd /k "echo AGENTE JPY INICIADO && echo. && uv run python src\agents\btc_hedge_agent.py USDJPYc --volume 0.10"
 
 echo.
 echo ============================================================

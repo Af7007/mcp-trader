@@ -683,7 +683,7 @@ def _extract_symbol_from_message(message: str) -> str:
     """Extract trading symbol from message (improved parsing)"""
     import re
 
-    # Find symbol in the exact case it appears, added XAUUSDc explicitly
+    # Find symbol in the exact case it appears, added XAUUSDm explicitly
     symbol_patterns = [
         r'\bBTCUSDC\b',  # BTCUSDc (exactly as needed)
         r'\b(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD|EURGBP|EURJPY|XAUUSD|XAUEUR|BTCUSD|ETHUSD)[a-zA-Z]*\b'

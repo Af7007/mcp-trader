@@ -164,25 +164,26 @@ class BTCLossZeroOtimizado:
             if rates is None or len(rates) < 20:
                 return
 
-            # Calcular RSI
+            # Calcular RSI e MFI
             rsi = self._calculate_rsi(rates, 14)
+            mfi = self._calculate_mfi(rates, 14)
 
-            # Gerar sinais
+            # Gerar sinais com dupla confirmação (RSI + MFI)
             signal = None
 
-            # SELL: RSI > 70 (overbought)
-            if self.use_sell and rsi > 70:
+            # SELL: RSI > 70 (overbought) E MFI > 40 (forte volume de venda)
+            if self.use_sell and rsi > 70 and mfi > 40:
                 signal = {
                     "type": "SELL",
-                    "reason": f"RSI overbought ({rsi:.2f})",
+                    "reason": f"RSI overbought ({rsi:.2f}) + MFI sell ({mfi:.2f})",
                     "price": rates[0]["close"]
                 }
 
-            # BUY: RSI < 30 (oversold)
-            elif self.use_buy and rsi < 30:
+            # BUY: RSI < 30 (oversold) E MFI < 60 (forte volume de compra)
+            elif self.use_buy and rsi < 30 and mfi < 60:
                 signal = {
                     "type": "BUY",
-                    "reason": f"RSI oversold ({rsi:.2f})",
+                    "reason": f"RSI oversold ({rsi:.2f}) + MFI buy ({mfi:.2f})",
                     "price": rates[0]["close"]
                 }
 
@@ -404,6 +405,78 @@ Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
 
         except Exception as e:
             logger.error(f"Erro ao calcular RSI: {e}")
+            return 50.0
+
+    def _calculate_mfi(self, rates, period: int = 14) -> float:
+        """
+        Calcula Money Flow Index (MFI) - indicador de volume
+
+        Fórmula:
+        1. Typical Price = (High + Low + Close) / 3
+        2. Money Flow = Typical Price × Volume
+        3. Positive Money Flow (quando preço sobe)
+        4. Negative Money Flow (quando preço desce)
+        5. Money Flow Ratio = Positive MF / Negative MF
+        6. MFI = 100 - (100 / (1 + Money Flow Ratio))
+
+        Interpretação:
+        - MFI > 40 = Forte volume em alta (SELL)
+        - MFI < 60 = Forte volume em baixa (BUY)
+        - MFI 40-60 = Neutro
+        """
+        try:
+            if not isinstance(rates, list):
+                rates = list(rates)
+
+            if len(rates) < period + 1:
+                return 50.0
+
+            # Extrair dados OHLCV
+            data = []
+            for r in rates[:period + 1]:
+                if isinstance(r, dict):
+                    typical_price = (float(r.get("high", 0)) + float(r.get("low", 0)) + float(r.get("close", 0))) / 3
+                    volume = float(r.get("tick_volume", 1))  # Usar tick_volume como proxy de volume
+                else:
+                    # Se é struct/numpy
+                    typical_price = (float(r[2]) + float(r[3]) + float(r[4])) / 3  # high, low, close
+                    volume = float(r[7]) if len(r) > 7 else 1  # tick_volume
+
+                money_flow = typical_price * volume
+                data.append({
+                    "typical_price": typical_price,
+                    "money_flow": money_flow,
+                    "volume": volume
+                })
+
+            # Reverter para ter mais antigo primeiro
+            data.reverse()
+
+            # Calcular positive e negative money flows
+            positive_mf = 0
+            negative_mf = 0
+
+            for i in range(1, len(data)):
+                current_tp = data[i]["typical_price"]
+                previous_tp = data[i-1]["typical_price"]
+                current_mf = data[i]["money_flow"]
+
+                if current_tp > previous_tp:
+                    positive_mf += current_mf
+                elif current_tp < previous_tp:
+                    negative_mf += current_mf
+
+            # Calcular Money Flow Ratio e MFI
+            if negative_mf == 0:
+                return 100.0 if positive_mf > 0 else 50.0
+
+            money_flow_ratio = positive_mf / negative_mf if negative_mf != 0 else 0
+            mfi = 100 - (100 / (1 + money_flow_ratio)) if money_flow_ratio >= 0 else 0
+
+            return mfi
+
+        except Exception as e:
+            logger.error(f"Erro ao calcular MFI: {e}")
             return 50.0
 
     def _notify(self, message: str):

@@ -168,7 +168,7 @@ uv publish --publish-url https://test.pypi.org/legacy/
 
 ### Symbol Format
 
-The broker uses symbols with 'c' suffix (e.g., `EURUSDc`, `XAUUSDc`). Always verify available symbols with `get_symbols()` or `get_symbols_by_group()`.
+The broker uses symbols with 'c' suffix (e.g., `EURUSDc`, `XAUUSDm`). Always verify available symbols with `get_symbols()` or `get_symbols_by_group()`.
 
 ### Order Management
 
@@ -233,7 +233,7 @@ Convert string to MT5 constant in `main.py` timeframe mapping
 - `run_chatbot_manager.py`: Full chatbot with agent system
 - `test_mt5_direct.py`: Quick integration test
 - **`RUN_BTC_AGENT.bat`**: Starts BTC Hedge trading agent
-- **`RUN_GOLD_AGENT.bat`**: Starts Gold (XAUUSDc) Hedge trading agent
+- **`RUN_GOLD_AGENT.bat`**: Starts Gold (XAUUSDm) Hedge trading agent
 - **`RUN_GBP_AGENT.bat`**: Starts GBP (GBPUSDc) Hedge trading agent
 - **`RUN_EUR_AGENT.bat`**: Starts EUR (EURUSDc) Hedge trading agent
 - **`RUN_JPY_AGENT.bat`**: Starts JPY (USDJPYc) Hedge trading agent
@@ -255,7 +255,7 @@ The Hedge Agent (`src/agents/btc_hedge_agent.py`) is a fully automated trading s
 
 *Crypto/Commodities:*
 - **BTCUSDm** (Bitcoin): 0.02 lots - `RUN_BTC_AGENT.bat`
-- **XAUUSDc** (Gold): 0.01 lots - `RUN_GOLD_AGENT.bat`
+- **XAUUSDm** (Gold): 0.01 lots - `RUN_GOLD_AGENT.bat`
 
 *Forex:*
 - **GBPUSDc** (British Pound): 0.10 lots - `RUN_GBP_AGENT.bat`
@@ -343,7 +343,7 @@ Database includes:
 - `DASHBOARD_MT5_VISUAL.md`: Complete dashboard setup guide
 - `INICIAR_TESTE_BTC.md`: BTC agent usage instructions
 - `test_btc_symbol.py`: Validates BTCUSDm availability
-- `test_gold_symbol.py`: Validates XAUUSDc availability
+- `test_gold_symbol.py`: Validates XAUUSDm availability
 - `test_forex_symbols.py`: Validates all Forex symbols (GBP, EUR, JPY)
 
 ## Environment Variables

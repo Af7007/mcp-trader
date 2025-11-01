@@ -40,7 +40,7 @@
       Preço: 1.16108
 
 💬 Você: comprar XAUUSD 0.01 SL 4100 TP 4110
-🟢 Abrindo BUY: XAUUSDc 0.01 lots
+🟢 Abrindo BUY: XAUUSDm 0.01 lots
    ✅ Ordem de compra executada!
       Ticket: 105654222
       Preço: 4102.50

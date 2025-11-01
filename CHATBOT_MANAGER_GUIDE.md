@@ -40,9 +40,9 @@ python run_chatbot_manager.py
 ```
 💬 Você: criar agente XAUUSD com RSI, TP $3, SL $1, volume 0.1
    ✅ Agente criado com sucesso!
-      Nome: XAUUSDc_RSI_20251022_173435
+      Nome: XAUUSDm_RSI_20251022_173435
       ID: 7e50f893
-      Símbolo: XAUUSDc
+      Símbolo: XAUUSDm
       Volume: 0.1
       TP: $3.0, SL: $1.0
       Indicadores: ['RSI']
@@ -62,7 +62,7 @@ python run_chatbot_manager.py
 ```
 💬 Você: listar agentes
    ✅ 2 agente(s) criado(s):
-      • XAUUSDc_RSI_20251022_173435 (7e50f893)
+      • XAUUSDm_RSI_20251022_173435 (7e50f893)
         Status: active
       • EURUSDc_BOLLINGER_20251022_173435 (a1b2c3d4)
         Status: active
@@ -131,7 +131,7 @@ python run_chatbot_manager.py
 
 💬 Você: listar agentes
    ✅ 2 agente(s) criado(s):
-      • XAUUSDc_RSI_20251022_173435 (7e50f893)
+      • XAUUSDm_RSI_20251022_173435 (7e50f893)
         Status: active
       • EURUSDc_MA_20251022_173435 (a1b2c3d4)
         Status: active
@@ -160,7 +160,7 @@ python run_chatbot_manager.py
 
 💬 Você: listar agentes
    ✅ 2 agente(s) criado(s):
-      • XAUUSDc_RSI_20251022_173435 (7e50f893)
+      • XAUUSDm_RSI_20251022_173435 (7e50f893)
         Status: paused
       • EURUSDc_MA_20251022_173435 (a1b2c3d4)
         Status: active

@@ -1,0 +1,249 @@
+================================================================================
+  TELEGRAM SIMPLIFICADO: APENAS SINAIS E ORDENS
+================================================================================
+
+DATA: 2025-10-27
+STATUS: ✅ IMPLEMENTADO
+
+================================================================================
+  O QUE FOI REMOVIDO
+================================================================================
+
+ANTES (Muitos Telegrams):
+  ❌ Resumo periódico a cada ~1 minuto
+  ❌ Resumo detalhado de métricas a cada 5 trades
+  ❌ Notificação de inicialização (startup)
+  ❌ Alertas de hedge ativado
+  ❌ Alertas de hedge fechado
+  ❌ Alertas de erro crítico
+  ❌ Notificação final ao parar
+
+RESULTADO: Muitos Telegrams por dia (poluição de chat)
+
+
+DEPOIS (Focado):
+  ✅ APENAS: Sinal de entrada (SELL aberto)
+  ✅ APENAS: Ordem fechada (resultado WIN/LOSS)
+  ✅ Nenhuma outra notificação
+
+RESULTADO: Apenas 2 tipos de mensagem (limpo e focado!)
+
+
+================================================================================
+  QUAIS NOTIFICAÇÕES VOCÊ RECEBERÁ NO TELEGRAM
+================================================================================
+
+1️⃣ SINAL DE ENTRADA - Quando SELL é aberto
+──────────────────────────────────────────
+
+🔴 POSIÇÃO ABERTA - XAUUSDm
+
+Tipo: SELL
+Volume: 0.01 lots
+Entrada: $4,070.00
+TP: $4,065.00
+SL: $4,073.50
+
+Indicadores:
+• RSI: 72.5
+• MACD: +0.15
+• Tendência: DOWN
+• ATR: 15.30
+
+⏰ 27/10/2025 14:30:45
+Ticket: #125967293
+
+
+2️⃣ ORDEM FECHADA - Quando trade fecha
+──────────────────────────────────────
+
+✅ POSIÇÃO FECHADA
+
+Ticket: #125967293
+💚 Resultado: +$5.00
+Tipo: SELL
+Duração: 8m 45s
+
+Preços:
+• Entrada: $4,070.00
+• Saída: $4,065.00
+• Diferença: -$5.00
+
+Hoje (XAUUSDm):
+• Lucro: +$152.50
+• Win Rate: 81.2%
+• Streak: 4 🔥
+• Operações: 32/999
+
+⏰ 27/10/2025 14:39:30
+
+
+================================================================================
+  RESUMO
+================================================================================
+
+NOTIFICAÇÕES MANTIDAS:
+  ✅ send_trade_opened() - Linha 668 (entrada)
+  ✅ send_trade_closed() - Linha 1005 (saída)
+
+NOTIFICAÇÕES REMOVIDAS:
+  ❌ send_periodic_summary() - Linha 1337 (removida)
+  ❌ send_metrics_summary() - Linha 1374 (removida)
+  ❌ send_critical_alert() - Startup (removida)
+  ❌ send_critical_alert() - Hedge (removida)
+  ❌ send_critical_alert() - Hedge Closed (removida)
+  ❌ send_critical_alert() - Stop (removida)
+  ❌ send_error_alert() - Erro (removida)
+
+
+================================================================================
+  BENEFÍCIOS
+================================================================================
+
+1. TELEGRAM LIMPO:
+   Antes: 30-40 mensagens/dia (resumos a cada minuto)
+   Depois: 8-12 mensagens/dia (apenas operações)
+
+2. FÁCIL DE ACOMPANHAR:
+   Cada mensagem = Uma decisão importante
+   Sem poluição de dados desnecessários
+
+3. NOTIFICAÇÕES RELEVANTES:
+   🔴 Sinal aberto = Decisão de ENTRADA
+   ✅ Trade fechado = Resultado FINAL
+
+4. MENOS DISTRAÇÕES:
+   Foco no que importa: Entradas e Saídas
+   Sem alertas de status/métricas/erros
+
+
+================================================================================
+  ESTRUTURA DE MENSAGENS
+================================================================================
+
+Cada mensagem contém:
+
+SINAL DE ENTRADA:
+  📌 Identificação (ticket, symbol)
+  📊 Parâmetros (tipo, volume, entrada, TP, SL)
+  📉 Indicadores (RSI, MACD, Trend, ATR)
+  ⏰ Timestamp
+
+ORDEM FECHADA:
+  📌 Identificação (ticket)
+  💰 Resultado (+/- $)
+  📊 Parâmetros (tipo, duração, preços)
+  📈 Stats do dia (lucro, win rate, streak, operações)
+  ⏰ Timestamp
+
+
+================================================================================
+  COMO USAR
+================================================================================
+
+Simplesmente configure Telegram normalmente:
+
+1. Obtenha TELEGRAM_BOT_TOKEN de @BotFather
+2. Obtenha TELEGRAM_CHAT_ID da API getUpdates
+3. Configure em .env:
+   TELEGRAM_ENABLED=true
+   TELEGRAM_BOT_TOKEN=seu_token
+   TELEGRAM_CHAT_ID=seu_chat_id
+
+4. Inicie o agent:
+   uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+5. Monitore Telegram:
+   - Verá sinal quando SELL abre
+   - Verá resultado quando trade fecha
+   - Nada mais!
+
+
+================================================================================
+  MENSAGENS QUE NÃO RECEBERÁ MAIS
+================================================================================
+
+❌ "📊 RESUMO DO AGENTE" (a cada minuto)
+❌ "📊 RESUMO DE MÉTRICAS" (a cada 5 trades)
+❌ "🚀 Agente Iniciado" (ao iniciar)
+❌ "🛡️ Hedge Ativado" (nunca, pois hedge desativado)
+❌ "🎯 Par de Hedge Fechado" (nunca, pois hedge desativado)
+❌ "⚠️ ALERTA" (erros e críticos)
+❌ "Agente Parado" (ao parar)
+
+
+================================================================================
+  EXEMPLO REAL: DIA TÍPICO
+================================================================================
+
+9:00 - Agent inicia (nenhuma mensagem)
+
+9:05 - 🔴 POSIÇÃO ABERTA [RSI 72, Trend DOWN, MACD -0.05]
+9:15 - ✅ POSIÇÃO FECHADA [+$5.00, 10m duração]
+
+9:20 - 🔴 POSIÇÃO ABERTA [RSI 75, Preço no topo BB]
+9:30 - ✅ POSIÇÃO FECHADA [+$4.80, 10m duração]
+
+10:05 - 🔴 POSIÇÃO ABERTA [RSI 71, MACD negativo]
+10:12 - ❌ POSIÇÃO FECHADA [-$5.20, 7m duração]
+
+... mais 5-9 operações ...
+
+Fim do dia:
+- Total de Telegrams: 8-12 (bem focado!)
+- Cada telegram = Decisão importante
+- Sem poluição de dados
+
+
+================================================================================
+  MUDANÇAS TÉCNICAS
+================================================================================
+
+Arquivo modificado:
+  src/agents/btc_hedge_agent.py
+
+Linhas removidas:
+  1333-1364: send_periodic_summary() (resumo a cada minuto)
+  1366-1389: send_metrics_summary() (métricas a cada 5 trades)
+  1261-1285: send_critical_alert() STARTUP (inicialização)
+  830-847: send_critical_alert() HEDGE (hedge ativado)
+  903-918: send_critical_alert() HEDGE_CLOSED (hedge fechado)
+  1335-1349: send_critical_alert() STOP (parada)
+  1355-1362: send_error_alert() (erros)
+
+Mantidas:
+  668: send_trade_opened() (sinal de entrada) ✅
+  1005: send_trade_closed() (ordem fechada) ✅
+
+
+================================================================================
+  VALIDAÇÃO
+================================================================================
+
+Para confirmar que está funcionando:
+
+1. Inicie o agent
+2. Aguarde um sinal SELL ser gerado (pode levar 1-5 minutos)
+3. Você receberá UMA mensagem no Telegram com 🔴 POSIÇÃO ABERTA
+4. Quando a posição fechar, receberá UMA mensagem com ✅ POSIÇÃO FECHADA
+5. Nenhuma outra mensagem entre abertura e fechamento
+
+Se receber múltiplas mensagens de "RESUMO" ou "MÉTRICAS", algo não funcionou.
+
+
+================================================================================
+  STATUS FINAL
+================================================================================
+
+✅ Telegram removido de resumos periódicos
+✅ Telegram removido de métricas
+✅ Telegram removido de alertas
+✅ Mantidas APENAS: Sinais (entrada) e Ordens (saída)
+✅ Chat do Telegram limpo e focado
+✅ Fácil de acompanhar
+
+PRONTO PARA USO: 🚀
+
+uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+================================================================================

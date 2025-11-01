@@ -255,7 +255,7 @@ stats = manager.get_agent_stats(agent.config.id)
 # Informações básicas
 stats['id']              # ID do agente
 stats['name']            # Nome do agente
-stats['symbol']          # Símbolo (ex: XAUUSDc)
+stats['symbol']          # Símbolo (ex: XAUUSDm)
 stats['status']          # Status atual
 
 # Timing

@@ -49,7 +49,7 @@ def diagnose():
 
     # 3. Verificar símbolos
     print("[3] Verificando símbolos disponíveis...")
-    symbols_to_check = ['BTCUSDm', 'BTCUSDc', 'XAUUSDc', 'EURUSDc', 'GBPUSDc', 'USDJPYc']
+    symbols_to_check = ['BTCUSDm', 'BTCUSDc', 'XAUUSDm', 'EURUSDc', 'GBPUSDc', 'USDJPYc']
 
     for symbol in symbols_to_check:
         try:

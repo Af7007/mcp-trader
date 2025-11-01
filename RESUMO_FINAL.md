@@ -22,7 +22,7 @@ python test_mt5_direct.py
 ✅ PASSOU: Conexão
 ✅ PASSOU: Informações da Conta ($1120.17)
 ✅ PASSOU: Posições Abertas
-✅ PASSOU: Validação de Símbolos (EURUSDc, GBPUSDc, XAUUSDc)
+✅ PASSOU: Validação de Símbolos (EURUSDc, GBPUSDc, XAUUSDm)
 ✅ PASSOU: Preços de Símbolos
 ✅ PASSOU: Dados de Mercado (Velas H1)
 ```
@@ -148,7 +148,7 @@ python run_chatbot_simple.py
 ### Símbolos Disponíveis
 - EURUSDc (Euro/Dólar)
 - GBPUSDc (Libra/Dólar)
-- XAUUSDc (Ouro/Dólar)
+- XAUUSDm (Ouro/Dólar)
 
 ---
 
@@ -217,7 +217,7 @@ fastapi>=0.119.1
 - Sempre use com "c" no final (cents)
 - ✅ EURUSDc
 - ✅ GBPUSDc
-- ✅ XAUUSDc
+- ✅ XAUUSDm
 
 ### Horário de Negociação
 - Verifique horário do broker

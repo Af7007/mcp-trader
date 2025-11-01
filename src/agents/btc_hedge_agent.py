@@ -1089,21 +1089,21 @@ class BTCHedgeAgent:
             sl = 0
             tp = 0
 
-            # Se conseguir história completa, usar dados de lá
+            # PRIORITY 1: Se conseguir história completa de deals do MT5, usar dados reais
             if deals and len(deals) >= 2:
                 open_deal = deals[0]
                 close_deal = deals[-1]
 
+                # Extrair preços REAIS do MT5
                 open_price = open_deal.get('price', 0)
-                close_price = close_deal.get('price', 0)
-                volume = open_deal.get('volume', 0) or self.volume  # Fallback para volume do agente
+                close_price = close_deal.get('price', 0)  # ← PREÇO REAL DE SAÍDA
+                volume = open_deal.get('volume', 0) or self.volume
 
-                # Extrair SL/TP dos deals (se disponível)
-                # MT5 pode ter SL/TP em um campo específico
+                # Extrair SL/TP dos deals
                 sl = open_deal.get('sl', 0)
                 tp = open_deal.get('tp', 0)
 
-                # Converter timestamps com fallback
+                # Converter timestamps
                 try:
                     open_timestamp = open_deal.get('time', 0)
                     if open_timestamp and open_timestamp > 0:
@@ -1123,31 +1123,32 @@ class BTCHedgeAgent:
                     close_time = datetime.now().isoformat()
 
                 logger.info(f"📊 Usando histórico de deals para ticket {ticket}")
+                logger.debug(f"   Open deal: price=${open_price:.2f} | Close deal: price=${close_price:.2f}")
 
-            # Senão, usar dados de trade_info (fallback)
+            # PRIORITY 2: Se trade_info existe, usar para completar dados (mas NÃO sobrescrever preços!)
             if trade_info:
-                # Usar trade_info como principal fonte de SL/TP
-                open_price = trade_info.get('price', open_price)
-                close_price = trade_info.get('close_price', open_price)
-                sl = trade_info.get('sl', sl)  # Priorizar SL do trade_info
-                tp = trade_info.get('tp', tp)  # Priorizar TP do trade_info
-                trade_type = trade_info.get('type', 'UNKNOWN')
+                # Usar trade_info para SL/TP e tipo apenas (não para preços)
+                trade_type = trade_info.get('type', trade_type)
 
-                # Converter time se for datetime object
-                if 'time' in trade_info:
+                # Só sobrescrever SL/TP se não temos de deals
+                if sl == 0:
+                    sl = trade_info.get('sl', sl)
+                if tp == 0:
+                    tp = trade_info.get('tp', tp)
+
+                # Converter time se for datetime object (apenas se não temos de deals)
+                if open_price == 0 and 'time' in trade_info:
                     trade_time = trade_info.get('time', datetime.now())
                     if isinstance(trade_time, datetime):
                         open_time = trade_time.isoformat()
                     else:
                         open_time = str(trade_time)
 
-                close_time = datetime.now().isoformat()
-
-                logger.info(f"✅ Usando trade_info para ticket {ticket} com SL=${sl:.2f} e TP=${tp:.2f}")
+                logger.info(f"✅ Complementado com trade_info para ticket {ticket} | Type: {trade_type}")
 
             # Se não temos trade_info, log aviso
             else:
-                logger.warning(f"⚠️  Posição #{ticket}: sem trade_info, usando dados de deals")
+                logger.warning(f"⚠️  Posição #{ticket}: sem trade_info, usando dados de deals apenas")
                 trade_type = 'UNKNOWN'
 
             # Se SL/TP ainda estão zerados, tentar recuperar do backup

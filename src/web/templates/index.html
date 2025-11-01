@@ -546,10 +546,10 @@
                         <button class="quick-btn" onclick="sendQuickMessage('Mostrar minhas posições abertas')">
                             <i class="fas fa-chart-line"></i> Ver Posições
                         </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('Comprar XAUUSDc 0.01 lots')">
+                        <button class="quick-btn" onclick="sendQuickMessage('Comprar XAUUSDm 0.01 lots')">
                             <i class="fas fa-shopping-cart"></i> <span style="color: #FFD700;">Comprar OURO</span>
                         </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('Vender XAUUSDc 0.01 lots')">
+                        <button class="quick-btn" onclick="sendQuickMessage('Vender XAUUSDm 0.01 lots')">
                             <i class="fas fa-sell"></i> <span style="color: #FFD700;">Vender OURO</span>
                         </button>
                         <button class="quick-btn" onclick="sendQuickMessage('Comprar BTCUSDc 0.001 lots')">
@@ -647,7 +647,7 @@
                         <div class="message-content">
                             <i class="fas fa-robot"></i> <strong>Trading Bot:</strong><br><br>
                             Olá! Sou seu assistente de trading inteligente. Posso ajudar você com:<br><br>
-                            • <strong>Ordens de compra/venda:</strong> "Comprar 0.01 XAUUSDc" ou "Vender 0.001 BTCUSDc"<br>
+                            • <strong>Ordens de compra/venda:</strong> "Comprar 0.01 XAUUSDm" ou "Vender 0.001 BTCUSDc"<br>
                             • <strong>Informações da conta:</strong> "Quanto tenho de saldo?" ou "Mostrar posições"<br>
                             • <strong>Análises:</strong> "Analisar EURUSD" ou "Melhores oportunidades agora"<br>
                             • <strong>Ordens pendentes:</strong> "Mostrar ordens ativas" ou "Cancelar ordem 123"<br><br>
@@ -669,7 +669,7 @@
                     <textarea
                         id="message-input"
                         class="message-input"
-                        placeholder="Digite sua mensagem aqui... (ex: 'Comprar XAUUSDc 0.01 lots')"
+                        placeholder="Digite sua mensagem aqui... (ex: 'Comprar XAUUSDm 0.01 lots')"
                         rows="1"
                         onkeydown="handleKeyDown(event)"
                         oninput="autoResizeTextarea()"
@@ -979,7 +979,7 @@
             } else {
                 modeText.textContent = '🤖 Modo Direto MT5';
                 modeHint.textContent = 'Use \'ok\' para confirmar';
-                messageInput.placeholder = 'Digite sua mensagem aqui... (ex: \'Comprar XAUUSDc 0.01 lots\')';
+                messageInput.placeholder = 'Digite sua mensagem aqui... (ex: \'Comprar XAUUSDm 0.01 lots\')';
                 addMessage('⚡ <strong>MODO DIRETO MT5 ATIVADO</strong><br><br>Agora você conversa diretamente com o MetaTrader 5 através de comandos simples em português.', 'system');
             }
 

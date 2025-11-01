@@ -66,7 +66,7 @@ def diagnose():
     logger.info("3️⃣  VERIFICAR SÍMBOLOS")
     logger.info("=" * 60)
     
-    symbols_to_check = ["XAUUSDc", "EURUSDc", "GBPUSDc"]
+    symbols_to_check = ["XAUUSDm", "EURUSDc", "GBPUSDc"]
     for symbol in symbols_to_check:
         info = mt5.symbol_info(symbol)
         if info:

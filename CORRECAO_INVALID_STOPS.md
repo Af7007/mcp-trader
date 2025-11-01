@@ -152,7 +152,7 @@ Agora mostra todos os valores antes de abrir posição:
 - **Mínimo**: max(broker, 100, 109.4) = **109.4**
 - **SL final**: 109,400 - 225 = **109,175** ✅
 
-### XAUUSDc (Preço: 2,650)
+### XAUUSDm (Preço: 2,650)
 - **ATR padrão**: 1.0
 - **SL distance**: 1.0 × 1.5 = 1.5
 - **Mínimo**: max(broker, 0.50, 2.65) = **2.65**

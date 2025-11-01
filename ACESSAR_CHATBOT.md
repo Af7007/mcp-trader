@@ -184,7 +184,7 @@ Antes de acessar o chatbot, certifique-se de:
 1. Use símbolos com "c" no final (cents)
    - ✅ EURUSDc
    - ✅ GBPUSDc
-   - ✅ XAUUSDc
+   - ✅ XAUUSDm
 
 ### Erro: "Ordem rejeitada"
 

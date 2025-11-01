@@ -1,0 +1,266 @@
+================================================================================
+  ATUALIZAÇÃO TELEGRAM: WIN/LOSS COM CONTADORES
+================================================================================
+
+DATA: 2025-10-27
+STATUS: ✅ IMPLEMENTADO
+
+================================================================================
+  O QUE MUDOU
+================================================================================
+
+ANTES (Ambíguo):
+  ✅ POSIÇÃO FECHADA
+  Resultado: +$5.00
+
+DEPOIS (Claro):
+  ✅ WIN
+  Resultado: +$5.00
+  ✅ Wins: 5
+  ❌ Losses: 2
+
+Agora fica MUITO CLARO se foi vitória ou derrota!
+
+
+================================================================================
+  EXEMPLO COMPLETO DE NOTIFICAÇÃO
+================================================================================
+
+CENÁRIO 1: TRADE COM LUCRO (WIN)
+════════════════════════════════
+
+✅ WIN
+
+🎫 Ticket: #125967293
+💚 Resultado: +$5.00
+📊 Tipo: SELL
+⏱️ Duração: 8m 45s
+
+📊 Preços:
+• Entrada: $4,070.00
+• Saída: $4,065.00
+• Diferença: -$5.00
+
+📈 Hoje (XAUUSDm):
+• ✅ Wins: 5
+• ❌ Losses: 2
+• Total: 7
+• Lucro: +$27.50
+• Win Rate: 71.4%
+
+⏰ 27/10/2025 14:45:30
+
+
+CENÁRIO 2: TRADE COM PREJUÍZO (LOSS)
+════════════════════════════════════
+
+❌ LOSS
+
+🎫 Ticket: #125967294
+❤️ Resultado: -$5.00
+📊 Tipo: SELL
+⏱️ Duração: 5m 12s
+
+📊 Preços:
+• Entrada: $4,068.00
+• Saída: $4,073.00
+• Diferença: +$5.00
+
+📈 Hoje (XAUUSDm):
+• ✅ Wins: 5
+• ❌ Losses: 3
+• Total: 8
+• Lucro: +$22.50
+• Win Rate: 62.5%
+
+⏰ 27/10/2025 14:50:15
+
+
+================================================================================
+  MUDANÇAS TÉCNICAS
+================================================================================
+
+ARQUIVO: src/core/telegram_notifier.py
+─────────────────────────────────────
+
+Função send_trade_closed() melhorada:
+  ✅ Novo parâmetro: total_wins
+  ✅ Novo parâmetro: total_losses
+  ✅ Detecta automaticamente: "WIN" se profit > 0, "LOSS" se profit <= 0
+  ✅ Mostra emoji: ✅ WIN ou ❌ LOSS no topo
+  ✅ Mostra contadores: ✅ Wins: X, ❌ Losses: Y
+
+Exemplo de chamada:
+  telegram.send_trade_closed(
+      ticket=123,
+      symbol="XAUUSDm",
+      trade_type="SELL",
+      entry_price=4070.00,
+      close_price=4065.00,
+      profit=5.00,
+      duration_seconds=525,
+      daily_stats={...},
+      total_wins=5,      ← NOVO
+      total_losses=2     ← NOVO
+  )
+
+
+ARQUIVO: src/agents/btc_hedge_agent.py
+──────────────────────────────────────
+
+Chamada atualizada (linha ~1033):
+  ✅ Calcula wins e losses antes de enviar
+  ✅ Passa total_wins e total_losses
+  ✅ Mostra contadores em tempo real
+
+
+================================================================================
+  BENEFÍCIOS
+================================================================================
+
+1. CLAREZA TOTAL:
+   ✅ WIN vs ❌ LOSS - sem ambiguidades
+   Antes você via "✅ POSIÇÃO FECHADA" mas não sabia se era lucro
+   Agora você vê "✅ WIN" ou "❌ LOSS" imediatamente
+
+2. RASTREAMENTO FÁCIL:
+   • ✅ Wins: 5
+   • ❌ Losses: 2
+   Você sabe instantaneamente a performance do dia
+
+3. ACOMPANHAMENTO EM TEMPO REAL:
+   Cada mensagem mostra o placar (WIN/LOSS) atualizado
+   Exemplo: Wins crescem de 5→6, Losses crescem de 2→3
+
+4. MELHOR PSICOLOGIA:
+   Ver "✅ WIN" é gratificante
+   Ver "❌ LOSS" motiva melhoria
+   Muito mais motivador que "✅ POSIÇÃO FECHADA"
+
+
+================================================================================
+  ESTRUTURA COMPLETA DA NOTIFICAÇÃO
+================================================================================
+
+┌─ TÍTULO CLARO ────────────────────────────────┐
+│ ✅ WIN     ou     ❌ LOSS                      │
+├────────────────────────────────────────────────┤
+│ 🎫 Ticket: #125967293                         │
+│ 💚/❤️ Resultado: +$5.00 / -$5.00               │
+│ 📊 Tipo: SELL                                  │
+│ ⏱️ Duração: 8m 45s                             │
+├────────────────────────────────────────────────┤
+│ 📊 Preços:                                     │
+│ • Entrada: $4,070.00                          │
+│ • Saída: $4,065.00                            │
+│ • Diferença: -$5.00                           │
+├────────────────────────────────────────────────┤
+│ 📈 Hoje (XAUUSDm):                             │
+│ • ✅ Wins: 5          ← NOVO CONTADOR         │
+│ • ❌ Losses: 2        ← NOVO CONTADOR         │
+│ • Total: 7            ← NOVO CONTADOR         │
+│ • Lucro: +$27.50                              │
+│ • Win Rate: 71.4%                             │
+├────────────────────────────────────────────────┤
+│ ⏰ 27/10/2025 14:45:30                         │
+└────────────────────────────────────────────────┘
+
+
+================================================================================
+  EVOLUÇÃO DAS NOTIFICAÇÕES
+================================================================================
+
+CRONOGRAMA DE UM TRADER COM 5 TRADES:
+
+Trade 1: ✅ WIN    (Wins: 1, Losses: 0)
+Trade 2: ✅ WIN    (Wins: 2, Losses: 0)
+Trade 3: ❌ LOSS   (Wins: 2, Losses: 1)
+Trade 4: ✅ WIN    (Wins: 3, Losses: 1)
+Trade 5: ✅ WIN    (Wins: 4, Losses: 1)
+
+Resultado: 4 Wins | 1 Loss | 80% Win Rate
+
+
+================================================================================
+  COMO LER AS MENSAGENS
+================================================================================
+
+RÁPIDO (5 segundos):
+  1. Olhe o emoji no topo: ✅ ou ❌
+  2. Veja "Resultado" se foi +$ ou -$
+  3. Note os contadores: Wins e Losses
+
+COMPLETO (30 segundos):
+  1. Leia o título: WIN ou LOSS
+  2. Veja quanto ganhou/perdeu: Resultado
+  3. Analise os contadores: Wins/Losses/Total
+  4. Acompanhe o progresso: Win Rate
+
+PROFUNDO (1 minuto):
+  1. Ticket único (rastreabilidade)
+  2. Duração da operação
+  3. Preços de entrada/saída
+  4. Performance acumulada
+
+
+================================================================================
+  EXEMPLOS REALISTAS
+================================================================================
+
+DIA COM BOA PERFORMANCE:
+  Após 10 trades: ✅ 8 Wins | ❌ 2 Losses | Win Rate 80% ✅
+
+DIA COM MÁ PERFORMANCE:
+  Após 8 trades: ✅ 4 Wins | ❌ 4 Losses | Win Rate 50% ⚠️
+
+DIA VENCEDOR:
+  Após 6 trades: ✅ 6 Wins | ❌ 0 Losses | Win Rate 100% 🔥
+
+
+================================================================================
+  VALIDAÇÃO
+================================================================================
+
+Para confirmar que está funcionando:
+
+1. Espere um trade fechar no Telegram
+2. Verifique se vê:
+   ✅ ✅ WIN  ou  ❌ ❌ LOSS
+   (Não apenas ✅ POSIÇÃO FECHADA)
+3. Verifique se mostra:
+   • ✅ Wins: X
+   • ❌ Losses: Y
+   (Não apenas "Operações: Z")
+4. Pronto! Está funcionando! 🎉
+
+
+================================================================================
+  PRÓXIMOS PASSOS
+================================================================================
+
+Simplesmente inicie o agent normalmente:
+
+  uv run python src/agents/btc_hedge_agent.py XAUUSDm
+
+As notificações de fechamento agora incluirão:
+  • ✅ WIN / ❌ LOSS (muito claro!)
+  • Total de Wins e Losses atualizados
+  • Placar em tempo real
+
+Nenhuma configuração adicional necessária! 🚀
+
+
+================================================================================
+  RESUMO
+================================================================================
+
+✅ Notificações agora mostram claramente: WIN ou LOSS
+✅ Contadores de Wins e Losses em cada mensagem
+✅ Fácil acompanhamento do placar do dia
+✅ Melhor psicologia de trading (WIN é motivador!)
+
+STATUS: ✅ PRONTO PARA USO
+
+Inicie o agent e veja as notificações melhoradas no Telegram! 📱
+
+================================================================================

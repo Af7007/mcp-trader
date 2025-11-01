@@ -55,8 +55,9 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Executar agente com USDJPYc
+REM Volume ajustado: 0.10 lots (forex usa volumes maiores)
 title JPY_AGENT - USDJPYc
-uv run python src\agents\btc_hedge_agent.py USDJPYc 0.10
+uv run python src\agents\btc_hedge_agent.py USDJPYc --volume 0.10
 
 echo.
 echo ============================================================

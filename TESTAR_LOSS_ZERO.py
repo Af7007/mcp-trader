@@ -203,6 +203,66 @@ def test_rsi_calculation():
         return False
 
 
+def test_mfi_calculation():
+    """Testa calculo do MFI"""
+    print("\n" + "="*70)
+    print("TESTE 6: Calculo de MFI (Money Flow Index)")
+    print("="*70)
+
+    try:
+        from core.mt5_direct_client import get_mt5_client
+        from agents.btc_loss_zero_otimizado import BTCLossZeroOtimizado
+        mt5 = get_mt5_client()
+        agent = BTCLossZeroOtimizado()
+
+        print("  Obtendo dados M1...", end=" ")
+        rates = mt5.copy_rates_from_pos(
+            "BTCUSDc",
+            "M1",
+            0,
+            50
+        )
+
+        if rates is None or len(rates) == 0:
+            print("[ERRO] Nao foi possivel obter dados")
+            return False
+
+        print("[OK]")
+
+        print("  Calculando MFI...", end=" ")
+        mfi = agent._calculate_mfi(rates, 14)
+        print("[OK]")
+        print(f"    MFI (14): {mfi:.2f}")
+        print(f"    Status: ", end="")
+
+        if mfi > 60:
+            print("FORTE VENDA (Volume High)")
+        elif mfi < 40:
+            print("FORTE COMPRA (Volume Low)")
+        else:
+            print("NEUTRO")
+
+        print(f"\n  Analise Combinada (RSI + MFI):")
+        rsi = agent._calculate_rsi(rates, 14)
+        print(f"    RSI: {rsi:.2f} | MFI: {mfi:.2f}")
+
+        # Verificar confirmacao dupla
+        if rsi > 70 and mfi > 40:
+            print(f"    [SINAL] DUPLA CONFIRMACAO - VENDA FORTE!")
+        elif rsi < 30 and mfi < 60:
+            print(f"    [SINAL] DUPLA CONFIRMACAO - COMPRA FORTE!")
+        else:
+            print(f"    [NEUTRO] Sem confirmacao dupla")
+
+        return True
+
+    except Exception as e:
+        print(f"[ERRO] {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Executa todos os testes"""
     print("\n")
@@ -216,6 +276,7 @@ def main():
         ("Simbolo BTCUSDc", test_symbol_availability),
         ("Inicializacao do Agente", test_agent_init),
         ("Calculo de RSI", test_rsi_calculation),
+        ("Calculo de MFI", test_mfi_calculation),
     ]
 
     results = []

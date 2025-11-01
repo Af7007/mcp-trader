@@ -65,7 +65,7 @@ python run_chatbot_simple.py
 
 - **EURUSDc** - Euro/Dólar
 - **GBPUSDc** - Libra/Dólar
-- **XAUUSDc** - Ouro/Dólar
+- **XAUUSDm** - Ouro/Dólar
 
 ---
 

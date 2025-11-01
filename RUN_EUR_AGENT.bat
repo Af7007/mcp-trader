@@ -55,8 +55,9 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Executar agente com EURUSDc
+REM Volume ajustado: 0.10 lots (forex usa volumes maiores)
 title EUR_AGENT - EURUSDc
-uv run python src\agents\btc_hedge_agent.py EURUSDc 0.10
+uv run python src\agents\btc_hedge_agent.py EURUSDc --volume 0.10
 
 echo.
 echo ============================================================

@@ -170,7 +170,7 @@ Se persistir o erro:
        Bid: 109545.23500
        Ask: 109546.23500
        Spread: 10 points
-    ✅ XAUUSDc: DISPONÍVEL
+    ✅ XAUUSDm: DISPONÍVEL
     ✅ EURUSDc: DISPONÍVEL
     ✅ GBPUSDc: DISPONÍVEL
 

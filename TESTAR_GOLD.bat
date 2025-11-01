@@ -4,7 +4,7 @@ echo ============================================================
 echo    TESTE DO SIMBOLO XAUUSD (OURO)
 echo ============================================================
 echo.
-echo  Este script verifica se XAUUSDc esta disponivel
+echo  Este script verifica se XAUUSDm esta disponivel
 echo  e funcionando corretamente no MT5.
 echo.
 echo ============================================================
@@ -17,7 +17,7 @@ if not exist "pyproject.toml" (
     exit /b 1
 )
 
-echo Testando simbolo XAUUSDc...
+echo Testando simbolo XAUUSDm...
 echo.
 
 uv run python test_gold_symbol.py

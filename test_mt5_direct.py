@@ -115,7 +115,7 @@ def test_symbols():
         import MetaTrader5 as mt5
         
         if mt5.initialize():
-            symbols_to_test = ["EURUSDc", "GBPUSDc", "XAUUSDc"]
+            symbols_to_test = ["EURUSDc", "GBPUSDc", "XAUUSDm"]
             
             for symbol in symbols_to_test:
                 # Tentar adicionar ao Market Watch
@@ -150,7 +150,7 @@ def test_prices():
         import MetaTrader5 as mt5
         
         if mt5.initialize():
-            symbols = ["EURUSDc", "GBPUSDc", "XAUUSDc"]
+            symbols = ["EURUSDc", "GBPUSDc", "XAUUSDm"]
             
             for symbol in symbols:
                 # Adicionar ao Market Watch

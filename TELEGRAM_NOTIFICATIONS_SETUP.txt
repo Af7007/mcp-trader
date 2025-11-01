@@ -1,0 +1,308 @@
+================================================================================
+  CONFIGURACAO: NOTIFICACOES TELEGRAM DO GOLD AGENT
+================================================================================
+
+DATA: 2025-10-27
+STATUS: ✅ IMPLEMENTADO E TESTADO
+
+================================================================================
+  O QUE FOI IMPLEMENTADO
+================================================================================
+
+1. NOTIFICACOES DE SINAIS (quando SELL abre)
+   ✓ Cada vez que um SELL é aberto, notificação enviada ao Telegram
+   ✓ Mostra: Ticket, tipo, volume, entry, TP, SL, indicadores (RSI, MACD, ATR, Trend)
+
+2. NOTIFICACOES DE FECHAMENTO (quando trade fecha)
+   ✓ Cada vez que um trade fecha (WIN ou LOSS), notificação enviada
+   ✓ Mostra: Ticket, resultado (+/- $), tipo, duração, preços
+   ✓ Mostra: Metricas do dia (lucro, win rate, streak, total operações)
+
+3. RESUMO PERIODICO A CADA MINUTO
+   ✓ A cada ~1 minuto, Telegram recebe resumo do agent
+   ✓ Mostra: Estado, posições abertas, lucro, stats (wins, losses, win rate)
+   ✓ Mostra: Indicadores técnicos (preço, trend, RSI, MACD, ATR, SMAs, BBs)
+
+4. RESUMO DETALHADO DE METRICAS A CADA 5 TRADES **[NOVO!]**
+   ✓ Após cada 5 trades, Telegram recebe resumo DETALHADO das métricas
+   ✓ Formato especializado com destaque visual
+   ✓ Mostra exatamente o que voce solicitou:
+     - [ ] Total de trades: número exato
+     - [ ] Total de vitorias: número exato
+     - [ ] Total de derrotas: número exato
+     - [ ] Win rate (%): percentual com emoji indicativo
+     - [ ] Lucro/prejuizo ($): valor com emoji colorido
+   ✓ Também mostra: ganho médio, perda média, preço atual
+   ✓ Emojis indicam qualidade da performance:
+     - 🔥 = Win rate >= 75% (excelente)
+     - 👍 = Win rate >= 60% (bom)
+     - ⚠️ = Win rate < 60% (atenção)
+
+5. ALERTAS CRITICOS (hedge, erros)
+   ✓ Quando hedge é ativado: notificação enviada
+   ✓ Quando erro ocorre: notificação enviada com detalhes
+
+================================================================================
+  CRONOGRAMA DE NOTIFICACOES
+================================================================================
+
+EVENTO                              FREQUENCIA              CONTEUDO
+──────────────────────────────────────────────────────────────────────────────
+SELL/BUY abre                       Imediato                Sinal + Indicadores
+Trade fecha (WIN/LOSS)              Imediato                Resultado + Metricas
+Resumo periódico                    A cada ~1 minuto        Estado + Stats
+Resumo de métricas **[NOVO!]**      A cada 5 trades         Metricas detalhadas
+Hedge ativado                       Imediato                Alerta crítico
+Erro ocorre                         Imediato                Alerta de erro
+
+================================================================================
+  COMO CONFIGURAR TELEGRAM
+================================================================================
+
+1. CRIAR BOT NO TELEGRAM:
+   a) Abra Telegram e procure "@BotFather"
+   b) Envie: /newbot
+   c) Escolha nome para bot (ex: "GoldTradingBot")
+   d) Escolha username (ex: "gold_trading_bot_XYZ")
+   e) Copie o TOKEN que receber
+
+2. OBTER CHAT ID:
+   a) Crie um grupo no Telegram (ex: "GoldTrading")
+   b) Convide seu bot para o grupo
+   c) Envie qualquer mensagem no grupo
+   d) Acesse: https://api.telegram.org/bot{SEU_TOKEN}/getUpdates
+   e) Procure por "chat":{"id":-123456789} (seu chat_id)
+   f) Copie o ID (com o "-" se tiver)
+
+3. CONFIGURAR .env:
+   TELEGRAM_ENABLED=true
+   TELEGRAM_BOT_TOKEN=123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
+   TELEGRAM_CHAT_ID=-123456789
+
+4. TESTAR:
+   python test_telegram.py
+
+================================================================================
+  EXEMPLO DE MENSAGENS QUE VOCE RECEBERÁ
+================================================================================
+
+QUANDO ABRE UM SELL:
+──────────────────────────────────────────────────────────────────────────────
+🔴 POSIÇÃO ABERTA - XAUUSDm
+
+Tipo: SELL
+Volume: 0.01 lots
+Entry: $4,070.00
+TP: $4,055.00
+SL: $4,080.00
+
+Indicadores:
+• RSI: 72.5
+• MACD: +0.15
+• Tendência: DOWN
+• ATR: 15.30
+
+⏰ 27/10/2025 14:30:45
+Ticket: #125967293
+
+
+QUANDO FECHA UM TRADE (WIN):
+──────────────────────────────────────────────────────────────────────────────
+✅ POSIÇÃO FECHADA
+
+Ticket: #125967293
+💚 Resultado: +$3.36
+Tipo: SELL
+Duração: 8m 45s
+
+Preços:
+• Entrada: $4,032.34
+• Saída: $4,028.98
+• Diferença: -$3.36
+
+Hoje (XAUUSDm):
+• Lucro: +$152.50
+• Win Rate: 81.2%
+• Streak: 4 🔥
+• Operações: 32/999
+
+⏰ 27/10/2025 14:39:30
+
+
+RESUMO DE METRICAS A CADA 5 TRADES **[NOVO!]**:
+──────────────────────────────────────────────────────────────────────────────
+📊 RESUMO DE MÉTRICAS - XAUUSDm
+
+⏰ Últimos 35 trades
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 OPERAÇÕES:
+  📊 Total de trades: 35
+  ✅ Total de vitorias: 28
+  ❌ Total de derrotas: 7
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 RESULTADO FINANCEIRO:
+  💚 Lucro/Prejuízo: +$450.25
+  🔥 Win Rate: 80.0%
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📉 MÉDIAS:
+  💚 Ganho Médio: +$16.08
+  ❤️ Perda Média: -$12.50
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Preço Atual: $4,058.75
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ 27/10/2025 14:45:00
+
+
+================================================================================
+  METRICAS RASTREADAS
+================================================================================
+
+Total de trades:
+  - Contagem de todas as operações SELL aberta no agent
+  - Inclui vencedoras e perdedoras
+  - Reseta a cada novo dia (00:00)
+
+Total de vitorias:
+  - Contagem de trades que fecharam com profit > 0
+  - Calcula em tempo real
+
+Total de derrotas:
+  - Contagem de trades que fecharam com profit <= 0
+  - Calcula em tempo real
+
+Win rate (%):
+  - (Vitorias / Total trades) * 100
+  - Exemplo: 28 wins / 35 total = 80.0%
+  - Emoji indica qualidade:
+    • 🔥 se >= 75%
+    • 👍 se >= 60%
+    • ⚠️ se < 60%
+
+Lucro/Prejuizo ($):
+  - Soma de todos os profits de trades fechados
+  - Acumula durante o dia
+  - Emoji indica:
+    • 💚 se positivo (ganho)
+    • ❤️ se negativo (perda)
+    • ⚪ se zero
+
+Ganho médio:
+  - Soma dos profits positivos / número de wins
+  - Mostra quanto se ganha em média por vitória
+
+Perda média:
+  - Soma dos profits negativos / número de losses
+  - Mostra quanto se perde em média por derrota
+
+================================================================================
+  TROUBLESHOOTING: SE NAO RECEBER NOTIFICACOES
+================================================================================
+
+1. VERIFICAR .env:
+   [ ] TELEGRAM_ENABLED=true?
+   [ ] TELEGRAM_BOT_TOKEN está correto?
+   [ ] TELEGRAM_CHAT_ID está correto?
+
+2. VERIFICAR BOT:
+   [ ] Bot está no grupo do Telegram?
+   [ ] Bot tem permissão de enviar mensagens?
+   [ ] Token não expirou?
+
+3. TESTAR CONEXAO:
+   python test_telegram.py
+   (deve enviar mensagem de teste)
+
+4. VERIFICAR LOGS:
+   Procure por:
+   - "Telegram Notifier inicializado com sucesso" = OK
+   - "⚠️ TELEGRAM_BOT_TOKEN não configurado" = Problema no .env
+   - "Erro ao enviar mensagem Telegram" = Problema na API
+
+5. ULTIMO RECURSO:
+   [ ] Reinicie o agent
+   [ ] Abra novo grupo no Telegram
+   [ ] Recolha token e chat_id novamente
+   [ ] Atualize .env
+
+================================================================================
+  OTIMIZACOES IMPLEMENTADAS
+================================================================================
+
+1. NOTIFICACOES NAO BLOQUEIAM O AGENT:
+   ✓ Telegram é enviado em thread separada (daemon)
+   ✓ Agent continua operando mesmo se Telegram falhar
+   ✓ Timeout de 5 segundos por mensagem
+
+2. TRATAMENTO DE ERROS:
+   ✓ Se Telegram falha, agent continua funcionando
+   ✓ Erros são registrados em logs
+   ✓ Não impactam trading
+
+3. METRICAS PRECISES:
+   ✓ Calculadas em tempo real
+   ✓ Baseadas em trades_today (memória)
+   ✓ Atualizadas quando trade fecha
+
+4. FREQUENCIA OTIMIZADA:
+   ✓ Resumo periódico: ~1 minuto (não sobrecarrega Telegram)
+   ✓ Resumo de métricas: a cada 5 trades (frequência razoável)
+   ✓ Sinais: imediato (importante)
+   ✓ Fechamentos: imediato (importante)
+
+================================================================================
+  PROXIMOS PASSOS
+================================================================================
+
+1. [ ] Configure TELEGRAM_BOT_TOKEN no .env
+2. [ ] Configure TELEGRAM_CHAT_ID no .env
+3. [ ] Set TELEGRAM_ENABLED=true
+4. [ ] Rode: python test_telegram.py
+5. [ ] Inicie o agent: uv run python src/agents/btc_hedge_agent.py XAUUSDm
+6. [ ] Monitore notificações no Telegram
+
+================================================================================
+  EXEMPLO DE .env FINAL
+================================================================================
+
+# Telegram
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
+TELEGRAM_CHAT_ID=-123456789
+
+# MT5
+MT5_TERMINAL_PATH=/path/to/mt5/terminal64.exe
+
+# Outros parametros...
+
+================================================================================
+  RESUMO
+================================================================================
+
+✅ Notificações de SELL signals: SIM
+✅ Notificações de fechamento (WIN/LOSS): SIM
+✅ Resumo periódico minuto a minuto: SIM
+✅ Resumo detalhado de métricas a cada 5 trades: SIM (NOVO!)
+✅ Métricas solicitadas presentes: SIM
+   - Total de trades
+   - Total de vitorias
+   - Total de derrotas
+   - Win rate (%)
+   - Lucro/prejuizo ($)
+
+✅ Formato visual com emojis: SIM
+✅ Nao bloqueia o agent: SIM
+✅ Tratamento de erros: SIM
+
+STATUS: PRONTO PARA USO!
+
+================================================================================
