@@ -58,21 +58,21 @@ class BTCLossZeroOtimizado:
         symbol: str = "BTCUSDc",
         volume: float = 0.05,
         check_interval: int = 15,
-        trailing_start_percent: float = 0.2,  # Reduzido de 0.5% para 0.2%
-        trailing_increment: float = 0.1,
+        trailing_start_amount: float = 1.0,  # Ativa com $1 de lucro (NOVO - em dólares)
+        trailing_increment_amount: float = 0.5,  # Sobe $0.50 a cada dólar de lucro (NOVO - em dólares)
         initial_sl_percent: float = 1.5,  # SL de segurança inicial (1.5%)
         initial_tp_percent: float = 5.0,  # TP de segurança inicial (5%)
         use_buy: bool = True,
         use_sell: bool = True
     ):
-        """Inicializa agente Loss Zero com SL/TP dinâmicos"""
+        """Inicializa agente Loss Zero com SL/TP dinâmicos e trailing em dólares"""
         self.symbol = symbol
         self.volume = volume
         self.check_interval = check_interval
-        self.trailing_start_percent = trailing_start_percent
-        self.trailing_increment = trailing_increment
-        self.initial_sl_percent = initial_sl_percent  # NOVO
-        self.initial_tp_percent = initial_tp_percent  # NOVO
+        self.trailing_start_amount = trailing_start_amount  # Em dólares
+        self.trailing_increment_amount = trailing_increment_amount  # Em dólares
+        self.initial_sl_percent = initial_sl_percent  # Percentual
+        self.initial_tp_percent = initial_tp_percent  # Percentual
         self.use_buy = use_buy
         self.use_sell = use_sell
 
@@ -85,13 +85,14 @@ class BTCLossZeroOtimizado:
 
         # Estado do agente
         self.trailing_active = False
-        self.trailing_distance = 0.0
+        self.trailing_amount_dollars = 0.0  # Trailing em dólares (não percentual)
         self.entry_price = 0.0
         self.entry_ticket = None
         self.position_type = None  # "BUY" ou "SELL"
         self.current_profit_pct = 0.0
-        self.current_sl = 0.0  # NOVO: Acompanha o SL dinâmico
-        self.current_tp = 0.0  # NOVO: TP de segurança
+        self.current_profit_dollars = 0.0  # Lucro em dólares
+        self.current_sl = 0.0  # SL dinâmico
+        self.current_tp = 0.0  # TP de segurança
 
         # Estatísticas
         self.total_trades = 0
@@ -104,8 +105,8 @@ class BTCLossZeroOtimizado:
         logger.info(f"   Volume: {self.volume}")
         logger.info(f"   SL Inicial (Segurança): {self.initial_sl_percent}%")
         logger.info(f"   TP Inicial (Segurança): {self.initial_tp_percent}%")
-        logger.info(f"   Trailing Start: {self.trailing_start_percent}% → DINÂMICO")
-        logger.info(f"   Trailing Increment: +{self.trailing_increment}%")
+        logger.info(f"   Trailing Start: ${self.trailing_start_amount:.2f} em lucro → DINÂMICO")
+        logger.info(f"   Trailing Increment: +${self.trailing_increment_amount:.2f} por dólar")
         logger.info(f"   Check Interval: {self.check_interval}s")
 
     def _init_mt5(self):
@@ -275,7 +276,7 @@ Estratégia: SL/TP dinâmicos com trailing ilimitado
             logger.error(traceback.format_exc())
 
     def _manage_position_trailing(self, pos, cycle: int):
-        """Gerencia trailing stop com SL dinâmico defendendo o trailing"""
+        """Gerencia trailing stop em DÓLARES com SL dinâmico"""
         try:
             # pos é um dicionário retornado pelo MT5
             current_price = pos.get('price_current', 0)
@@ -286,58 +287,61 @@ Estratégia: SL/TP dinâmicos com trailing ilimitado
             if current_price == 0 or price_open == 0:
                 return
 
-            # Calcular lucro percentual
+            # Calcular lucro em DÓLARES (não em percentual)
             if pos_type == 0:  # BUY
+                profit_dollars = (current_price - price_open) * self.volume * 100  # Converter para dólares
                 profit_pct = ((current_price - price_open) / price_open) * 100
             else:  # SELL
+                profit_dollars = (price_open - current_price) * self.volume * 100  # Converter para dólares
                 profit_pct = ((price_open - current_price) / price_open) * 100
 
             self.current_profit_pct = profit_pct
+            self.current_profit_dollars = profit_dollars
 
-            # Ativar trailing quando atinge limite (0.2%)
-            if not self.trailing_active and profit_pct >= self.trailing_start_percent:
+            # Ativar trailing quando lucro atinge $1 (ou valor configurado)
+            if not self.trailing_active and profit_dollars >= self.trailing_start_amount:
                 self.trailing_active = True
-                self.trailing_distance = self.trailing_start_percent
+                self.trailing_amount_dollars = self.trailing_start_amount
 
-                # NOVO: Atualizar SL para defender o trailing
-                new_sl = self._calculate_new_sl(current_price, pos_type, profit_pct)
+                # Atualizar SL para defender o trailing
+                new_sl = self._calculate_new_sl_dollars(current_price, pos_type, profit_dollars)
                 self.current_sl = new_sl
                 self._update_position_sl(ticket, new_sl)
 
                 msg = f"""[INICIO] TRAILING ATIVADO - SL DINÂMICO ATIVADO!
 Ticket: {ticket}
-Lucro: {profit_pct:.2f}%
-Trailing Stop em: {self.trailing_distance:.2f}%
+Lucro: ${profit_dollars:.2f} ({profit_pct:.2f}%)
+Trailing Stop em: ${self.trailing_amount_dollars:.2f}
 SL Atualizado para: ${new_sl:.2f}
 """
                 logger.info(msg)
                 self._notify(msg)
-                return  # Aguardar próximo ciclo para atualizar
+                return  # Aguardar próximo ciclo
 
-            # Atualizar trailing quando preço continua favorável
+            # Atualizar trailing quando lucro cresce
             if self.trailing_active:
-                # Se lucro > distância + incremento, aumenta o trailing
-                if profit_pct > self.trailing_distance + self.trailing_increment:
-                    old_distance = self.trailing_distance
-                    self.trailing_distance = profit_pct - self.trailing_increment
+                # Se lucro ultrapassou trailing + incremento, aumenta o trailing
+                if profit_dollars > self.trailing_amount_dollars + self.trailing_increment_amount:
+                    old_amount = self.trailing_amount_dollars
+                    self.trailing_amount_dollars = profit_dollars - self.trailing_increment_amount
 
-                    # NOVO: Atualizar SL para defender o novo trailing
-                    new_sl = self._calculate_new_sl(current_price, pos_type, self.trailing_distance)
+                    # Atualizar SL para defender o novo trailing
+                    new_sl = self._calculate_new_sl_dollars(current_price, pos_type, self.trailing_amount_dollars)
                     self.current_sl = new_sl
                     self._update_position_sl(ticket, new_sl)
 
-                    logger.info(f"[SUBIDA] Trailing: {old_distance:.2f}% → {self.trailing_distance:.2f}% | SL: ${new_sl:.2f} | Lucro: {profit_pct:.2f}%")
+                    logger.info(f"[SUBIDA] Trailing: ${old_amount:.2f} → ${self.trailing_amount_dollars:.2f} | SL: ${new_sl:.2f} | Lucro: ${profit_dollars:.2f}")
 
-                # Verificar se deve fechar (preço caiu abaixo do trailing)
-                elif profit_pct < self.trailing_distance:
-                    logger.info(f"[PARADO] STOP ATIVADO! Lucro: {profit_pct:.2f}% < Stop: {self.trailing_distance:.2f}%")
+                # Verificar se deve fechar (lucro caiu abaixo do trailing)
+                elif profit_dollars < self.trailing_amount_dollars:
+                    logger.info(f"[PARADO] STOP ATIVADO! Lucro: ${profit_dollars:.2f} < Stop: ${self.trailing_amount_dollars:.2f}")
                     self._close_position_with_profit(pos, profit_pct)
                     return
 
                 # Log de monitoramento a cada ciclo
                 else:
                     if cycle % 4 == 0:  # Log a cada 4 ciclos (60 segundos)
-                        logger.info(f"[MONITOR] Ticket {ticket}: Lucro {profit_pct:.2f}% | Trailing {self.trailing_distance:.2f}% | SL ${self.current_sl:.2f}")
+                        logger.info(f"[MONITOR] Ticket {ticket}: Lucro ${profit_dollars:.2f} | Trailing ${self.trailing_amount_dollars:.2f} | SL ${self.current_sl:.2f}")
 
         except Exception as e:
             logger.error(f"Erro ao gerenciar trailing: {e}")
@@ -345,14 +349,27 @@ SL Atualizado para: ${new_sl:.2f}
             logger.error(traceback.format_exc())
 
     def _calculate_new_sl(self, current_price: float, pos_type: int, trailing_distance: float) -> float:
-        """Calcula novo SL baseado no trailing distance"""
+        """Calcula novo SL baseado no trailing distance (percentual - LEGADO)"""
         if pos_type == 0:  # BUY
             # Para BUY: SL fica abaixo do preço atual, deixando margem do trailing
-            # Se trailing é 0.5%, o SL fica bem pertinho em 0.4%
             new_sl = current_price * (1 - (trailing_distance - 0.05) / 100)
         else:  # SELL
             # Para SELL: SL fica acima do preço atual, deixando margem do trailing
             new_sl = current_price * (1 + (trailing_distance - 0.05) / 100)
+
+        return new_sl
+
+    def _calculate_new_sl_dollars(self, current_price: float, pos_type: int, trailing_dollars: float) -> float:
+        """Calcula novo SL baseado no trailing em DÓLARES"""
+        # Converter trailing de dólares para preço
+        price_distance = trailing_dollars / self.volume / 100
+
+        if pos_type == 0:  # BUY
+            # Para BUY: SL fica abaixo do preço, com margem de $0.05
+            new_sl = current_price - (price_distance - 0.05)
+        else:  # SELL
+            # Para SELL: SL fica acima do preço, com margem de $0.05
+            new_sl = current_price + (price_distance - 0.05)
 
         return new_sl
 
@@ -586,24 +603,24 @@ Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
         logger.info("Estratégia Utilizada:")
         logger.info(f"  SL Inicial (Segurança): {self.initial_sl_percent}%")
         logger.info(f"  TP Inicial (Segurança): {self.initial_tp_percent}%")
-        logger.info(f"  Trailing Start: {self.trailing_start_percent}%")
-        logger.info(f"  Trailing Increment: +{self.trailing_increment}%")
-        logger.info(f"  SL Dinâmico: Defendendo o trailing stop")
+        logger.info(f"  Trailing Start: ${self.trailing_start_amount:.2f} em lucro")
+        logger.info(f"  Trailing Increment: +${self.trailing_increment_amount:.2f} por dólar")
+        logger.info(f"  SL Dinâmico: Defendendo o trailing stop em dólares")
         logger.info("=" * 70 + "\n")
 
 
 def main():
     """Função principal para iniciar o agente"""
     try:
-        # Criar agente Loss Zero com SL/TP dinâmicos
+        # Criar agente Loss Zero com SL/TP dinâmicos e trailing em DÓLARES
         agent = BTCLossZeroOtimizado(
             symbol="BTCUSDc",
             volume=0.05,
             check_interval=15,
-            trailing_start_percent=0.2,  # Trailing inicia em 0.2% (reduzido)
-            trailing_increment=0.1,      # Sobe +0.1% por movimento
-            initial_sl_percent=1.5,      # SL de segurança: 1.5%
-            initial_tp_percent=5.0,      # TP de segurança: 5%
+            trailing_start_amount=1.0,     # Ativa com $1 de lucro
+            trailing_increment_amount=0.5, # Sobe $0.50 a cada dólar de lucro
+            initial_sl_percent=1.5,        # SL de segurança: 1.5%
+            initial_tp_percent=5.0,        # TP de segurança: 5%
             use_buy=True,
             use_sell=True
         )

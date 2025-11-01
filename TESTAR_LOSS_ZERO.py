@@ -132,8 +132,8 @@ def test_agent_init():
             symbol="BTCUSDc",
             volume=0.05,
             check_interval=15,
-            trailing_start_percent=0.5,
-            trailing_increment=0.1,
+            trailing_start_amount=1.0,
+            trailing_increment_amount=0.5,
             use_buy=True,
             use_sell=True
         )
@@ -142,8 +142,8 @@ def test_agent_init():
         print("  Validando configuracao:")
         print(f"    Symbol: {agent.symbol}")
         print(f"    Volume: {agent.volume}")
-        print(f"    Trailing Start: {agent.trailing_start_percent}%")
-        print(f"    Trailing Increment: {agent.trailing_increment}%")
+        print(f"    Trailing Start: ${agent.trailing_start_amount:.2f} em lucro")
+        print(f"    Trailing Increment: +${agent.trailing_increment_amount:.2f} por dólar")
         print(f"    BUY/SELL: {'Ativo' if agent.use_buy and agent.use_sell else 'Seletivo'}")
 
         return True
