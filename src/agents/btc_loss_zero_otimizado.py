@@ -138,7 +138,9 @@ class BTCLossZeroOtimizado:
             positions = self.mt5.positions_get(symbol=self.symbol)
 
             if not positions:
-                # Sem posições, analisar para abrir
+                # Sem posições, resetar trailing e analisar para abrir
+                self.trailing_active = False
+                self.trailing_distance = 0.0
                 self._analyze_and_open(cycle)
             else:
                 # Tem posição, gerenciar trailing
@@ -253,6 +255,7 @@ TP: INFINITO (trailing ilimitado)
             current_price = pos.get('price_current', 0)
             pos_type = pos.get('type', 0)  # 0 = BUY, 1 = SELL
             price_open = pos.get('price_open', 0)
+            ticket = pos.get('ticket', 0)
 
             if current_price == 0 or price_open == 0:
                 return
@@ -269,9 +272,10 @@ TP: INFINITO (trailing ilimitado)
             if not self.trailing_active and profit_pct >= self.trailing_start_percent:
                 self.trailing_active = True
                 self.trailing_distance = self.trailing_start_percent
-                msg = f"[INICIO] TRAILING ATIVADO! Lucro: {profit_pct:.2f}% | Distância: {self.trailing_distance:.2f}%"
+                msg = f"[INICIO] TRAILING ATIVADO! Ticket: {ticket} | Lucro: {profit_pct:.2f}% | Stop em: {self.trailing_distance:.2f}%"
                 logger.info(msg)
                 self._notify(msg)
+                return  # Aguardar próximo ciclo para atualizar
 
             # Atualizar trailing quando preço continua favorável
             if self.trailing_active:
@@ -279,14 +283,24 @@ TP: INFINITO (trailing ilimitado)
                 if profit_pct > self.trailing_distance + self.trailing_increment:
                     old_distance = self.trailing_distance
                     self.trailing_distance = profit_pct - self.trailing_increment
-                    logger.info(f"[SUBIDA] Trailing atualizado: {old_distance:.2f}% → {self.trailing_distance:.2f}% (Lucro atual: {profit_pct:.2f}%)")
+                    logger.info(f"[SUBIDA] Trailing: {old_distance:.2f}% → {self.trailing_distance:.2f}% (Lucro: {profit_pct:.2f}%)")
 
                 # Verificar se deve fechar (preço caiu abaixo do trailing)
-                if profit_pct < self.trailing_distance * 0.95:  # 5% de tolerância
+                # Fecha quando lucro cai abaixo do stop
+                elif profit_pct < self.trailing_distance:
+                    logger.info(f"[PARADO] STOP ATIVADO! Lucro: {profit_pct:.2f}% < Stop: {self.trailing_distance:.2f}%")
                     self._close_position_with_profit(pos, profit_pct)
+                    return
+
+                # Log de monitoramento a cada ciclo
+                else:
+                    if cycle % 4 == 0:  # Log a cada 4 ciclos (60 segundos)
+                        logger.info(f"[MONITOR] Ticket {ticket}: Lucro {profit_pct:.2f}% | Stop em {self.trailing_distance:.2f}%")
 
         except Exception as e:
             logger.error(f"Erro ao gerenciar trailing: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _close_position_with_profit(self, pos, profit_pct: float):
         """Fecha posição com lucro via trailing stop"""
