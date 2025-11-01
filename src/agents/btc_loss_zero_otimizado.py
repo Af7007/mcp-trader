@@ -254,10 +254,10 @@ class BTCLossZeroOtimizado:
                 )
 
             # Verificar se ordem foi executada (retcode == 10009 = TRADE_RETCODE_DONE)
-            # OrderSendResult é um objeto, não dicionário - acessar como atributo
-            if result and result.retcode == 10009:
+            # MCP client retorna dict, não OrderSendResult
+            if result and result.get('retcode') == 10009:
                 self.entry_price = entry_price
-                self.entry_ticket = result.order
+                self.entry_ticket = result.get('order')
                 self.position_type = signal["type"]
                 self.current_sl = sl  # NOVO: Armazena SL atual
                 self.current_tp = tp  # NOVO: Armazena TP atual
@@ -284,7 +284,7 @@ Estratégia: SL/TP em dólares fixos + trailing dinâmico
                 self._notify(msg)
             else:
                 logger.error(f"Erro ao abrir posição: {result}")
-                retcode = result.retcode if result else "None"
+                retcode = result.get('retcode') if result else "None"
                 logger.error(f"  Retcode esperado: 10009, recebido: {retcode}")
 
         except Exception as e:
@@ -414,7 +414,8 @@ SL Atualizado para: ${new_sl:.2f}
 
             result = mt5.order_send(request)
 
-            # OrderSendResult é um objeto, não dicionário - acessar como atributo
+            # NOTA: mt5.order_send() retorna OrderSendResult (objeto MT5 nativo)
+            # Diferente de self.mt5 que usa MCP e retorna dict
             if result and result.retcode == 10009:  # TRADE_RETCODE_DONE
                 logger.info(f"[ATUALIZAR] SL da posição {ticket} atualizado para ${new_sl:.2f}")
             else:
@@ -432,8 +433,8 @@ SL Atualizado para: ${new_sl:.2f}
 
             result = self.mt5.close_position(ticket)
 
-            # OrderSendResult é um objeto, não dicionário - acessar como atributo
-            if result and result.retcode == 10009:  # TRADE_RETCODE_DONE
+            # MCP client retorna dict, não OrderSendResult
+            if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
                 self.total_profit += profit_pct * self.volume * 100  # Aproximação
                 self.profitable_trades += 1
                 self.current_win_streak += 1
