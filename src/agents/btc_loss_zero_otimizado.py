@@ -71,8 +71,17 @@ class BTCLossZeroOtimizado:
         self.check_interval = check_interval
         self.trailing_start_amount = trailing_start_amount  # Em dólares
         self.trailing_increment_amount = trailing_increment_amount  # Em dólares
-        self.initial_sl_percent = initial_sl_percent  # Percentual
-        self.initial_tp_percent = initial_tp_percent  # Percentual
+
+        # Distâncias em DÓLARES (não em percentual!)
+        # Loss máximo desejado em dólares
+        self.max_loss_dollars = 4.0  # Máximo de $4 de loss
+        # Ganho desejado em dólares (TP)
+        self.target_gain_dollars = 20.0  # Alvo de ~$20 de ganho
+
+        # Nota: initial_sl_percent e initial_tp_percent são apenas para logging
+        self.initial_sl_percent = initial_sl_percent
+        self.initial_tp_percent = initial_tp_percent
+
         self.use_buy = use_buy
         self.use_sell = use_sell
 
@@ -205,19 +214,24 @@ class BTCLossZeroOtimizado:
             logger.error(f"Erro na análise: {e}")
 
     def _open_position(self, signal: Dict):
-        """Abre nova posição com SL/TP de segurança e trailing dinâmico"""
+        """Abre nova posição com SL/TP em DÓLARES (não percentual!)"""
         try:
             # Fechar posições opostas primeiro
             self._close_opposite_positions(signal["type"])
 
             entry_price = signal["price"]
 
-            # Calcular SL e TP de segurança inicial
+            # Calcular SL e TP em dólares (não em percentual!)
+            # Fórmula: Distância de preço = Loss em $ / (Volume × 100)
+            sl_distance = self.max_loss_dollars / (self.volume * 100)
+            tp_distance = self.target_gain_dollars / (self.volume * 100)
+
             if signal["type"] == "SELL":
-                # Para SELL: SL acima do preço de entrada
-                sl = entry_price * (1 + self.initial_sl_percent / 100)
-                # TP abaixo do preço de entrada
-                tp = entry_price * (1 - self.initial_tp_percent / 100)
+                # Para SELL:
+                # SL acima do preço de entrada (proteção)
+                sl = entry_price + sl_distance
+                # TP abaixo do preço de entrada (ganho)
+                tp = entry_price - tp_distance
                 result = self.mt5.sell_market(
                     symbol=self.symbol,
                     volume=self.volume,
@@ -226,10 +240,11 @@ class BTCLossZeroOtimizado:
                     comment="LossZero"
                 )
             else:  # BUY
-                # Para BUY: SL abaixo do preço de entrada
-                sl = entry_price * (1 - self.initial_sl_percent / 100)
-                # TP acima do preço de entrada
-                tp = entry_price * (1 + self.initial_tp_percent / 100)
+                # Para BUY:
+                # SL abaixo do preço de entrada (proteção)
+                sl = entry_price - sl_distance
+                # TP acima do preço de entrada (ganho)
+                tp = entry_price + tp_distance
                 result = self.mt5.buy_market(
                     symbol=self.symbol,
                     volume=self.volume,
@@ -239,9 +254,10 @@ class BTCLossZeroOtimizado:
                 )
 
             # Verificar se ordem foi executada (retcode == 10009 = TRADE_RETCODE_DONE)
-            if result and result.get('retcode') == 10009:
+            # OrderSendResult é um objeto, não dicionário - acessar como atributo
+            if result and result.retcode == 10009:
                 self.entry_price = entry_price
-                self.entry_ticket = result.get('order')
+                self.entry_ticket = result.order
                 self.position_type = signal["type"]
                 self.current_sl = sl  # NOVO: Armazena SL atual
                 self.current_tp = tp  # NOVO: Armazena TP atual
@@ -258,17 +274,18 @@ Ticket: {self.entry_ticket}
 Preço: ${entry_price:.2f}
 Volume: {self.volume}
 Motivo: {signal["reason"]}
-SL Inicial (Segurança): ${sl:.2f} ({self.initial_sl_percent}%)
-TP Inicial (Segurança): ${tp:.2f} ({self.initial_tp_percent}%)
+SL (Proteção): ${sl:.2f} (máx loss: ${self.max_loss_dollars:.2f})
+TP (Alvo): ${tp:.2f} (ganho alvo: ${self.target_gain_dollars:.2f})
 Trailing: Ativa em ${self.trailing_start_amount:.2f} em lucro (inativo)
-Estratégia: SL/TP dinâmicos com trailing em dólares
+Estratégia: SL/TP em dólares fixos + trailing dinâmico
 {'='*50}
 """
                 logger.info(msg)
                 self._notify(msg)
             else:
                 logger.error(f"Erro ao abrir posição: {result}")
-                logger.error(f"  Retcode esperado: 10009, recebido: {result.get('retcode') if result else 'None'}")
+                retcode = result.retcode if result else "None"
+                logger.error(f"  Retcode esperado: 10009, recebido: {retcode}")
 
         except Exception as e:
             logger.error(f"Erro ao abrir posição: {e}")
@@ -397,10 +414,12 @@ SL Atualizado para: ${new_sl:.2f}
 
             result = mt5.order_send(request)
 
-            if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+            # OrderSendResult é um objeto, não dicionário - acessar como atributo
+            if result and result.retcode == 10009:  # TRADE_RETCODE_DONE
                 logger.info(f"[ATUALIZAR] SL da posição {ticket} atualizado para ${new_sl:.2f}")
             else:
-                logger.error(f"Erro ao atualizar SL: {result}")
+                retcode = result.retcode if result else "None"
+                logger.error(f"Erro ao atualizar SL (retcode {retcode}): {result}")
 
         except Exception as e:
             logger.error(f"Erro ao atualizar SL da posição: {e}")
@@ -413,7 +432,8 @@ SL Atualizado para: ${new_sl:.2f}
 
             result = self.mt5.close_position(ticket)
 
-            if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+            # OrderSendResult é um objeto, não dicionário - acessar como atributo
+            if result and result.retcode == 10009:  # TRADE_RETCODE_DONE
                 self.total_profit += profit_pct * self.volume * 100  # Aproximação
                 self.profitable_trades += 1
                 self.current_win_streak += 1
