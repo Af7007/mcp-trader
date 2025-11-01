@@ -23,6 +23,7 @@ Configuração:
 import logging
 import time
 import sys
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List
@@ -165,6 +166,9 @@ class BTCLossZeroOtimizado:
                 # Tem posição, gerenciar trailing
                 for pos in positions:
                     self._manage_position_trailing(pos, cycle)
+
+            # Exportar dados para visualização no MT5
+            self._export_data()
 
         except Exception as e:
             logger.error(f"Erro no ciclo {cycle}: {e}")
@@ -601,6 +605,61 @@ Win Rate: {(self.profitable_trades/self.total_trades*100):.1f}%
         except Exception as e:
             logger.error(f"Erro ao calcular MFI: {e}")
             return 50.0
+
+    def _export_data(self):
+        """Exporta dados do agente para JSON para visualização no MT5"""
+        try:
+            # Obter posições abertas
+            positions = self.mt5.positions_get(symbol=self.symbol)
+
+            # Obter preço atual
+            tick = self.mt5.symbol_info_tick(self.symbol)
+            current_price = tick.get('bid', 0) if tick else 0
+
+            data = {
+                "timestamp": datetime.now().isoformat(),
+                "symbol": self.symbol,
+                "current_price": current_price,
+                "has_position": len(positions) > 0 if positions else False,
+                "trailing_active": self.trailing_active,
+                "trailing_amount_dollars": self.trailing_amount_dollars,
+                "entry_price": self.entry_price,
+                "entry_ticket": self.entry_ticket,
+                "position_type": self.position_type,
+                "sl": 0,
+                "tp": 0,
+                "profit": 0,
+                "trailing_stop_level": 0
+            }
+
+            # Se tem posição, extrair dados
+            if positions and len(positions) > 0:
+                pos = positions[0]  # Primeira posição
+                data["sl"] = pos.get('sl', 0)
+                data["tp"] = pos.get('tp', 0)
+                data["profit"] = pos.get('profit', 0)
+                data["entry_price"] = pos.get('price_open', 0)
+                data["entry_ticket"] = pos.get('ticket', 0)
+                data["position_type"] = "BUY" if pos.get('type') == 0 else "SELL"
+
+                # Calcular nível do trailing stop
+                if self.trailing_active and self.trailing_amount_dollars > 0:
+                    if pos.get('type') == 0:  # BUY
+                        # Trailing stop está abaixo do preço atual
+                        price_distance = self.trailing_amount_dollars / (self.volume * 100)
+                        data["trailing_stop_level"] = current_price - price_distance
+                    else:  # SELL
+                        # Trailing stop está acima do preço atual
+                        price_distance = self.trailing_amount_dollars / (self.volume * 100)
+                        data["trailing_stop_level"] = current_price + price_distance
+
+            # Salvar em JSON
+            export_path = Path(__file__).parent.parent.parent / "btc_loss_zero_data.json"
+            with open(export_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            logger.error(f"Erro ao exportar dados: {e}")
 
     def _notify(self, message: str):
         """Envia notificação via Telegram"""
