@@ -68,7 +68,6 @@ print(f"  - Trailing será ativado em $1.00 lucro")
 print(f"  - Trailing protege $0.50 adicional")
 print(f"\n{'='*60}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD... ")
 
 # Criar agente com multiplicadores CORRIGIDOS
 agent = GoldLossZeroSimple(

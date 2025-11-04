@@ -174,7 +174,8 @@ class MT5Client:
         self,
         symbol: Optional[str] = None,
         group: Optional[str] = None,
-        ticket: Optional[int] = None
+        ticket: Optional[int] = None,
+        magic: Optional[int] = None
     ) -> Optional[List[Dict]]:
         """
         Obtém posições abertas.
@@ -183,6 +184,7 @@ class MT5Client:
             symbol: Filtrar por símbolo
             group: Filtrar por grupo
             ticket: Filtrar por ticket específico
+            magic: Filtrar por magic number (identifica o agente)
         """
         self._ensure_initialized()
 
@@ -199,7 +201,13 @@ class MT5Client:
             # Retorna lista vazia se não houver posições (não é erro)
             return []
 
-        return [self._to_dict(p) for p in positions]
+        result = [self._to_dict(p) for p in positions]
+
+        # Filtrar por magic number se especificado
+        if magic is not None:
+            result = [p for p in result if p.get('magic') == magic]
+
+        return result
 
     def orders_get(
         self,
@@ -271,7 +279,8 @@ class MT5Client:
         volume: float,
         sl: Optional[float] = None,
         tp: Optional[float] = None,
-        comment: Optional[str] = None
+        comment: Optional[str] = None,
+        magic: int = 123456
     ) -> Optional[Dict[str, Any]]:
         """
         Abre posição de COMPRA a mercado.
@@ -282,6 +291,7 @@ class MT5Client:
             sl: Stop Loss (opcional)
             tp: Take Profit (opcional)
             comment: Comentário da ordem (opcional)
+            magic: Magic number para identificar o agente (padrão: 123456)
         """
         self._ensure_initialized()
 
@@ -298,7 +308,7 @@ class MT5Client:
             "type": mt5.ORDER_TYPE_BUY,
             "price": tick.ask,
             "deviation": 10,
-            "magic": 123456,
+            "magic": magic,
             "comment": comment or "",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
@@ -323,7 +333,8 @@ class MT5Client:
         volume: float,
         sl: Optional[float] = None,
         tp: Optional[float] = None,
-        comment: Optional[str] = None
+        comment: Optional[str] = None,
+        magic: int = 123456
     ) -> Optional[Dict[str, Any]]:
         """
         Abre posição de VENDA a mercado.
@@ -334,6 +345,7 @@ class MT5Client:
             sl: Stop Loss (opcional)
             tp: Take Profit (opcional)
             comment: Comentário da ordem (opcional)
+            magic: Magic number para identificar o agente (padrão: 123456)
         """
         self._ensure_initialized()
 
@@ -350,7 +362,7 @@ class MT5Client:
             "type": mt5.ORDER_TYPE_SELL,
             "price": tick.bid,
             "deviation": 10,
-            "magic": 123456,
+            "magic": magic,
             "comment": comment or "",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
@@ -365,6 +377,45 @@ class MT5Client:
         result = mt5.order_send(request)
         if result is None:
             logger.error(f"Erro ao enviar ordem: {mt5.last_error()}")
+            return None
+
+        return self._to_dict(result)
+
+    def modify_position(
+        self,
+        ticket: int,
+        sl: Optional[float] = None,
+        tp: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Modifica SL/TP de uma posição existente.
+
+        Args:
+            ticket: Ticket da posição
+            sl: Novo Stop Loss (None para manter atual)
+            tp: Novo Take Profit (None para manter atual, 0 para remover)
+        """
+        self._ensure_initialized()
+
+        # Obter informações da posição
+        positions = mt5.positions_get(ticket=ticket)
+        if positions is None or len(positions) == 0:
+            logger.error(f"Posição {ticket} não encontrada")
+            return None
+
+        position = positions[0]
+
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": position.symbol,
+            "position": ticket,
+            "sl": sl if sl is not None else position.sl,
+            "tp": tp if tp is not None else position.tp,
+        }
+
+        result = mt5.order_send(request)
+        if result is None:
+            logger.error(f"Erro ao modificar posição: {mt5.last_error()}")
             return None
 
         return self._to_dict(result)

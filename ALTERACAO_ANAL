@@ -1,0 +1,48 @@
+# TODO LIST ATUALIZADO - Análise Game para M1
+
+## Alterações Realizadas com Sucesso
+
+### ✅ Concluído - Mudança de Timeframe M5 → M1
+
+**Arquivo alterado**: `src/web/game_api.py`
+
+**Alterações específicas implementadas:**
+
+1. **Função de Confirmação**:
+   - Substituição completa de `rates_m5` por `rates_m1_conf`
+   - Alteração de variáveis `m5_ups/downs` para `m1_ups/downs`
+   - Mudança de condições de `m5_uptrend/downtrend` para `m1_uptrend/downtrend`
+
+2. **Lógica de BUY Score**:
+   - Substituição da condição `if m5_uptrend or (not m5_downtrend and ups_20 > downs_20):`
+   - Alteração para `if m1_uptrend or (not m1_downtrend and ups_20 > downs_20):`
+   - Mudança do badge de `"✓M5" if m5_uptrend else "M1"` para `"✓M1"`
+
+3. **Lógica de SELL Score**:
+   - Substituição da condição `if m5_downtrend or (not m5_uptrend and downs_20 > ups_20):`
+   - Alteração para `if m1_downtrend or (not m1_uptrend and downs_20 > ups_20):`
+   - Mudança do badge de `"✓M5" if m5_downtrend else "M1"` para `"✓M1"`
+
+4. **Comentários e Logs**:
+   - Atualização de todos os logs para refletir M1
+   - Alteração de mensagens de erro para mencionar M1
+   - Mudança de comentários explicativos
+
+## Status Final
+
+**✅ CONCLUÍDO**: A análise do game agora usa apenas timeframe M1 ao invés de M5.
+
+### Detalhes da Implementação
+
+- **Antes**: Sistema usava M5 como confirmação + M1 como análise principal
+- **Depois**: Sistema usa apenas M1 para tudo (confirmação + análise principal)
+- **Benefício**: Maior frequência de sinais, menos dependência de timeframes maiores
+- **Compatibilidade**: Todas as APIs e interface web funcionam normalmente
+
+### Arquivos Afetados
+
+- ✅ `src/web/game_api.py` - Função `_predict_next_candle()` completamente atualizada
+
+### Teste Recomendado
+
+Após a implementação, recomenda-se testar o endpoint `/api/game/prediction` para confirmar que os sinais agora mostram "✓M1" ao invés de "✓M5".

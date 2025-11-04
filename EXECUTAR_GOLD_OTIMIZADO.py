@@ -65,7 +65,6 @@ print(f"  ✓ Filtros de suporte/resistência")
 print(f"  ✓ Volume aumentado para maior impacto")
 print(f"\n{'='*70}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD OTIMIZADO... ")
 
 # Criar agente OTIMIZADO
 agent = GoldLossZeroSimple(

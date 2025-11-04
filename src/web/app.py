@@ -10,8 +10,8 @@ from typing import Dict, Any, List
 import sys
 from pathlib import Path
 # Add src and project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+project_root = Path(__file__).parent.parent.parent  # Go up to C:\mcp-trader
+sys.path.insert(0, str(project_root / 'src'))
 
 from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
@@ -34,16 +34,37 @@ import traceback
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder=str(project_root / 'src' / 'web' / 'static'))
+app = Flask(__name__,
+            static_folder=str(project_root / 'src' / 'web' / 'static'),
+            template_folder=str(project_root / 'src' / 'web' / 'templates'))
 CORS(app)
 
 # Flask configuration
 app.secret_key = 'trading-chatbot-secret-key-change-in-production'
 app.config['SESSION_TYPE'] = 'filesystem'
 
+# Disable caching for development
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['EXPLAIN_TEMPLATE_LOADING'] = True
+app.jinja_env.auto_reload = True
+app.jinja_env.cache = {}
+
+# Add no-cache headers to all responses
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
 # Global agent manager instance
 agent_manager = None
 worker_running = False
+
+# Register game blueprint
+from web.game_api import game_bp
+app.register_blueprint(game_bp)
 
 
 @app.route('/')

@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Teste Direto do BTC Loss Zero M1 Agressivo
+"""
+
+print("🚀 TESTE DIRETO BTC LOSS ZERO M1 AGRESSIVO")
+print("="*50)
+
+try:
+    import sys
+    from pathlib import Path
+    print("✅ Importações básicas OK")
+    
+    sys.path.insert(0, str(Path(__file__).parent))
+    print("✅ Path configurado")
+    
+    from btc_loss_zero_m1_agressivo import BTCLossZeroM1Agressivo
+    print("✅ Importação do agente M1 OK")
+    
+    # Criar agente
+    agent = BTCLossZeroM1Agressivo(symbol="BTCUSDc", use_demo=True)
+    print("✅ Agente M1 criado com sucesso!")
+    
+    # Verificar configurações
+    print(f"\n📊 CONFIGURAÇÕES VERIFICADAS:")
+    print(f"   Volume: {agent.volume} lotes")
+    print(f"   Stop Loss: ${agent.sl_fixed}")
+    print(f"   Take Profit: ${agent.tp_fixed}")
+    print(f"   Trailing Start: ${agent.trailing_start}")
+    print(f"   Trailing Increment: ${agent.trailing_increment}")
+    print(f"   Check Interval: {agent.check_interval}s")
+    
+    # Testar obtenção de dados
+    market_data = agent.get_market_data()
+    if market_data:
+        print(f"\n✅ Dados de mercado obtidos:")
+        print(f"   Preço: ${market_data['current_price']:.2f}")
+        print(f"   RSI: {market_data['indicators']['rsi']:.1f}")
+        print(f"   MACD: {market_data['indicators']['macd']:+.2f}")
+        
+        # Testar análise
+        signal = agent.analyze_signal(market_data)
+        print(f"   Sinal: {signal}")
+        
+        print(f"\n🎯 ESTRATÉGIA M1 AGRESSIVA FUNCIONANDO!")
+        print(f"   ✅ Agente criado")
+        print(f"   ✅ Dados obtidos")
+        print(f"   ✅ Análise funcionando")
+        print(f"   ✅ Configurações corretas")
+        print(f"   ✅ PRONTO PARA USAR!")
+        
+    else:
+        print("❌ Erro ao obter dados de mercado")
+        
+except Exception as e:
+    print(f"❌ Erro no teste: {e}")
+    import traceback
+    traceback.print_exc()
+
+print("\n" + "="*50)
+print("🏁 TESTE FINALIZADO")

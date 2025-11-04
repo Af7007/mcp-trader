@@ -1,0 +1,213 @@
+# 🚀 COMO EXECUTAR O AGENTE BTC LOSS ZERO M1 AGRESSIVO
+
+## 📋 OPÇÕES DISPONÍVEIS
+
+### **1️⃣ VERSÃO M1 AGRESSIVO (Solicitada)**
+```bash
+# Executar agente M1 agressivo completo
+python btc_loss_zero_m1_final.py
+```
+
+### **2️⃣ VERSÃO ORIGINAL LOSS ZERO**
+```bash
+# Executar versão original (testada)
+python executar_loss_zero_simples.py
+```
+
+### **3️⃣ VERSÃO FUNCIONAL**
+```bash
+# Executar versão funcional
+python btc_loss_zero_funcional.py
+```
+
+---
+
+## 🎯 CONFIGURAÇÕES M1 AGRESSIVO
+
+### **Parâmetros Implementados:**
+- ✅ **Timeframe**: M1 (1 minuto)
+- ✅ **Stop Loss**: $3 fixo
+- ✅ **Take Profit**: $5 fixo
+- ✅ **Lote**: 0.05 (agressivo)
+- ✅ **Trailing**: Ativa em $0.5, sobe $1 a cada $1 de lucro
+- ✅ **Posição**: Sempre defendida pelo trailing
+
+---
+
+## 🖥️ COMO EXECUTAR PASSO A PASSO
+
+### **Passo 1: Abrir Terminal**
+- Pressione `Win + R`
+- Digite `cmd` e pressione Enter
+- Navegue até a pasta do projeto:
+```bash
+cd c:\mcp-trader
+```
+
+### **Passo 2: Escolher Versão**
+
+#### **Opção A: M1 Agressivo (Recomendado)**
+```bash
+python btc_loss_zero_m1_final.py
+```
+
+#### **Opção B: Versão Original**
+```bash
+python executar_loss_zero_simples.py
+```
+
+#### **Opção C: Versão Funcional**
+```bash
+python btc_loss_zero_funcional.py
+```
+
+---
+
+## 📊 O QUE ESPERAR
+
+### **M1 Agressivo:**
+- 🚀 Operações ultra-curtas (M1)
+- 💰 SL/TP fixos ($3/$5)
+- 📈 Trailing agressivo ($0.5 → $1/$1)
+- ⚡ Check a cada 5 segundos
+- 🎯 Volume 0.05 lotes
+
+### **Original:**
+- 📊 Operações normais (M5/M15)
+- 🔄 Trailing dinâmico (0.3% → 5%)
+- ⏱️ Check a cada 30 segundos
+- 🎯 Volume 0.01 lotes
+
+---
+
+## 🛡️ MODOS DE OPERAÇÃO
+
+### **Modo Demo (Simulação)**
+- Todas as versões rodam em modo demo por padrão
+- Sem risco financeiro real
+- Ideal para testes
+
+### **Modo Live (Real)**
+- Disponível apenas em versões completas
+- Requer conexão MT5 ativa
+- Trading com dinheiro real
+
+---
+
+## 🚨 COMANDOS ÚTEIS
+
+### **Parar o Agente:**
+- Pressione `Ctrl + C` no terminal
+
+### **Verificar Status:**
+- O agente mostra status em tempo real
+- Trades, win rate, lucro total
+
+### **Reiniciar:**
+- Feche o terminal (`Ctrl + C`)
+- Execute o comando novamente
+
+---
+
+## 📈 EXEMPLO DE EXECUÇÃO
+
+```bash
+C:\mcp-trader> python btc_loss_zero_m1_final.py
+
+🚀 BTC LOSS ZERO M1 AGRESSIVO
+============================================================
+✅ Agente M1 inicializado!
+   Símbolo: BTCUSDc
+   Timeframe: M1 (1 minuto)
+   Modo: DEMO (Simulação)
+   Volume: 0.05 lotes (agressivo)
+   Stop Loss: $3.0 fixo
+   Take Profit: $5.0 fixo
+   Trailing: Ativa em $0.5, sobe $1.0 a cada $1
+   Check Interval: 5s
+
+🎯 ESTRATÉGIA M1 AGRESSIVA:
+   ✓ Operações ultra-curtas (M1)
+   ✓ SL/TP fixos ($3/$5)
+   ✓ Trailing agressivo ($0.5 → $1/$1)
+   ✓ Posição sempre defendida
+============================================================
+
+🚀 Iniciando teste M1 agressivo...
+================================================================================
+📈 SINAL DETECTADO: BUY
+   Preço: $43567.89
+   RSI: 32.4
+   MACD: -15.2
+
+🎯 POSIÇÃO DEMO ABERTA: BUY $43567.89
+   Ticket: 123456
+   Volume: 0.05 lotes
+   SL: $3.0 fixo
+   TP: $5.0 fixo
+   Trailing: Ativa em $0.5
+
+🚀 TRAILING ATIVADO em $0.52 lucro!
+   Distância inicial: $0.50
+
+📈 TRAILING ATUALIZADO: $0.50 → $1.02
+   Lucro atual: $1.52
+```
+
+---
+
+## 🔧 SOLUÇÃO DE PROBLEMAS
+
+### **Erro: "python não é reconhecido"**
+```bash
+# Use py em vez de python
+py btc_loss_zero_m1_final.py
+```
+
+### **Erro: "arquivo não encontrado"**
+```bash
+# Verifique se está na pasta correta
+dir
+# Deve ver btc_loss_zero_m1_final.py
+```
+
+### **Erro: "módulo não encontrado"**
+```bash
+# Instale dependências
+pip install -r requirements.txt
+```
+
+---
+
+## 📞 SUPORTE
+
+### **Arquivos Principais:**
+- `btc_loss_zero_m1_final.py` - Agente M1 agressivo
+- `executar_loss_zero_simples.py` - Versão original
+- `btc_loss_zero_funcional.py` - Versão funcional
+
+### **Documentação:**
+- `BTC_LOSS_ZERO_M1_AGRESSIVO_RESUMO.md` - Guia completo
+- `BTC_LOSS_ZERO_DOCUMENTACAO.md` - Documentação técnica
+
+---
+
+## 🏁 RESUMO
+
+**Para executar o agente M1 agressivo:**
+```bash
+cd c:\mcp-trader
+python btc_loss_zero_m1_final.py
+```
+
+**Para executar versão original:**
+```bash
+cd c:\mcp-trader
+python executar_loss_zero_simples.py
+```
+
+**Ambas as versões estão funcionando e prontas para uso!**
+
+---
+
+*Guia criado em 11/01/2025 - BTC Loss Zero M1 Agressivo*

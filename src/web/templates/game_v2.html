@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d001a">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>GOLD TRADING GAME - 170 CANDLES</title>
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
+    <!-- Google Fonts - Premium -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+
+    
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <!-- Howler.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/game_v2.css?t={{ timestamp }}">
+</head>
+<body>
+    <!-- Three.js Background Container -->
+    <div id="three-bg"></div>
+    
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="slot-machine-3d">
+            <i class="fas fa-coins fa-spin"></i>
+            <i class="fas fa-gem fa-spin"></i>
+            <i class="fas fa-dollar-sign fa-spin"></i>
+        </div>
+        <h1 class="neon-title">GOLD LOSS ZERO</h1>
+        <div class="loading-bar-container">
+            <div class="loading-bar-fill"></div>
+        </div>
+        <p class="loading-subtitle">Carregando o cassino...</p>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="game-container hidden">
+        
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="balance-display">
+                <i class="fas fa-wallet"></i>
+                <div class="balance-content">
+                    <span class="balance-label">SALDO</span>
+                    <span id="account-balance" class="balance-value">$0.00</span>
+                </div>
+            </div>
+            
+            <div class="stats-mini">
+                <div class="stat-item">
+                    <i class="fas fa-trophy"></i>
+                    <span id="total-profit" class="stat-value">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-percentage"></i>
+                    <span id="win-rate" class="stat-value">0%</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-fire"></i>
+                    <span id="streak" class="stat-value">0</span>
+                </div>
+            </div>
+            
+            <button id="btn-sound" class="btn-icon-round">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </header>
+
+        <!-- Chart Full Width -->
+        <div class="chart-full">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>XAU/USD • M1</span>
+                    <span id="current-price" class="live-price">$0000.00</span>
+                </div>
+                <canvas id="price-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+
+            <!-- Left Panel: Analysis -->
+            <div class="left-panel">
+                <div class="analysis-card">
+                    <div class="card-header">
+                        <i class="fas fa-brain"></i>
+                        <span>ANÁLISE TÉCNICA</span>
+                    </div>
+                    <div class="analysis-content">
+                        <div id="signal-indicator" class="signal-indicator">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            <span>Analisando...</span>
+                        </div>
+                        <div class="score-display">
+                            <div class="score-label">SCORE</div>
+                            <div id="score-circle" class="score-circle">
+                                <svg viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" class="score-bg"/>
+                                    <circle id="score-progress" cx="50" cy="50" r="45" class="score-progress"/>
+                                </svg>
+                                <div id="score-value" class="score-value">0</div>
+                            </div>
+                        </div>
+                        <div id="analysis-details" class="analysis-details"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Panel: BIG PROFIT DISPLAY -->
+            <div class="center-panel">
+                <div class="mega-display">
+                    <div class="operation-status">
+                        <i id="op-icon" class="fas fa-circle"></i>
+                        <span id="op-status">AGUARDANDO</span>
+                    </div>
+                    
+                    <div id="profit-mega" class="profit-mega">
+                        <span class="currency">$</span>
+                        <span id="profit-value">0.00</span>
+                    </div>
+                    
+                    <div class="profit-label">OPERAÇÃO ATIVA</div>
+                </div>
+                
+                <!-- Trading Controls -->
+                <div class="trading-panel">
+                    <div class="input-group">
+                        <label><i class="fas fa-balance-scale"></i> LOTE</label>
+                        <div class="input-stepper">
+                            <button class="btn-stepper" id="volume-minus">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <div id="volume-display" class="stepper-value">0.02</div>
+                            <button class="btn-stepper" id="volume-plus">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label><i class="fas fa-shield-alt"></i> STOP LOSS</label>
+                        <div class="input-stepper">
+                            <button class="btn-stepper" id="sl-minus">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <div id="sl-display" class="stepper-value">$5.00</div>
+                            <button class="btn-stepper" id="sl-plus">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons-mega">
+                    <button id="btn-buy" class="btn-mega btn-buy">
+                        <i class="fas fa-arrow-trend-up"></i>
+                        <span>COMPRAR</span>
+                    </button>
+                    <button id="btn-sell" class="btn-mega btn-sell">
+                        <i class="fas fa-arrow-trend-down"></i>
+                        <span>VENDER</span>
+                    </button>
+                </div>
+                
+                <div class="trailing-badge">
+                    <i class="fas fa-robot"></i>
+                    Trailing Dinâmico: Ativa em Lucro = SL • Protege: SL-$0.10 (+$0.10)
+                </div>
+            </div>
+
+            <!-- Right Panel: Positions + History -->
+            <div class="right-panel">
+                <div class="positions-card">
+                    <div class="card-header">
+                        <i class="fas fa-list-check"></i>
+                        <span>POSIÇÕES</span>
+                        <span id="positions-count" class="badge">0</span>
+                    </div>
+                    <div id="positions-list" class="list-content"></div>
+                </div>
+                
+                <div class="history-card">
+                    <div class="card-header">
+                        <i class="fas fa-history"></i>
+                        <span>HISTÓRICO</span>
+                    </div>
+                    <div id="history-list" class="list-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Scripts -->
+    <script src="/static/js/game_v2.js?t={{ timestamp }}"></script>
+</body>
+</html>

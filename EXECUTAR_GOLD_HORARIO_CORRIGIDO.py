@@ -75,7 +75,6 @@ print(f"  ✓ Controle de tentativas de ordens")
 print(f"  ✓ Flexibilidade máxima mantida")
 print(f"\n{'='*70}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD HORÁRIO CORRIGIDO... ")
 
 # Criar agente
 agent = GoldLossZeroSimple(

@@ -1,0 +1,11 @@
+- [x] Criar plano de análise e otimização
+- [ ] Examinar implementação atual do btc_loss_zero_agent.py
+- [ ] Analisar testes existentes (teste_btc_loss_zero.py)
+- [ ] Revisar scripts de execução (executar_btc_loss_zero.py)
+- [ ] Identificar problemas na lógica de loss zero
+- [ ] Verificar integração com MT5
+- [ ] Otimizar gestão de risco e posições
+- [ ] Implementar versão corrigida
+- [ ] Testar estratégia otimizada
+- [ ] Criar documentação final
+- [ ] Fornecer executável funcional

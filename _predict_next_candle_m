@@ -1,0 +1,205 @@
+def _predict_next_candle(mt5) -> Dict:
+    """
+    Prediction system - M1 ONLY ANALYSIS
+    Returns:
+        {
+            "type": "BUY" | "SELL" | "WAIT",
+            "score": 0-100,
+            "confidence": 0-100,
+            "reason": "explanation"
+        }
+    """
+    try:
+        print("[PREDICTION] Starting M1 analysis...")
+        
+        # === M1 Analysis Only ===
+        rates_m1 = mt5.copy_rates_from_pos(
+            symbol="XAUUSDc",
+            timeframe="M1",
+            start_pos=0,
+            count=30
+        )
+        
+        print(f"[PREDICTION] M1 candles: {len(rates_m1) if rates_m1 else 0}")
+        
+        if not rates_m1 or len(rates_m1) < 10:
+            print("[PREDICTION] ERROR: Insufficient M1 data")
+            return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "Insufficient M1 data"}
+        
+        closes_m1 = [r['close'] for r in rates_m1[:6]]
+        m1_ups = sum([1 for i in range(5) if closes_m1[i] > closes_m1[i+1]])
+        m1_downs = sum([1 for i in range(5) if closes_m1[i] < closes_m1[i+1]])
+        
+        # Menos rigoroso: 3+ ao invés de 4+
+        m1_uptrend = m1_ups >= 3
+        m1_downtrend = m1_downs >= 3
+        
+        # Se empate, usar o que tem mais
+        if m1_ups == m1_downs:
+            m1_uptrend = False
+            m1_downtrend = False
+        elif m1_ups > m1_downs:
+            m1_uptrend = True
+            m1_downtrend = False
+        else:
+            m1_uptrend = False
+            m1_downtrend = True
+        
+        print(f"[PREDICTION] M1 trend: ups={m1_ups}, downs={m1_downs}, uptrend={m1_uptrend}, downtrend={m1_downtrend}")
+        
+        if not m1_uptrend and not m1_downtrend:
+            print("[PREDICTION] No clear M1 trend - continuing with detailed M1 analysis")
+            # Continua para análise M1 detalhada
+        
+        # === Detailed M1 Analysis ===
+        rates_m1_detailed = mt5.copy_rates_from_pos(
+            symbol="XAUUSDc",
+            timeframe="M1",
+            start_pos=0,
+            count=25
+        )
+        
+        print(f"[PREDICTION] M1 detailed candles: {len(rates_m1_detailed) if rates_m1_detailed else 0}")
+        
+        if not rates_m1_detailed or len(rates_m1_detailed) < 25:
+            print("[PREDICTION] ERROR: Insufficient M1 detailed data")
+            return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "Insufficient M1 data"}
+        
+        closes = [r['close'] for r in rates_m1_detailed[:21]]
+        highs = [r['high'] for r in rates_m1_detailed[:21]]
+        lows = [r['low'] for r in rates_m1_detailed[:21]]
+        
+        current = closes[0]
+        
+        # Averages
+        sma_5 = sum(closes[:5]) / 5
+        sma_10 = sum(closes[:10]) / 10
+        sma_20 = sum(closes[:20]) / 20
+        
+        # Trends
+        ups_20 = sum([1 for i in range(20) if closes[i] > closes[i+1]])
+        downs_20 = sum([1 for i in range(20) if closes[i] < closes[i+1]])
+        ups_10 = sum([1 for i in range(10) if closes[i] > closes[i+1]])
+        downs_10 = sum([1 for i in range(10) if closes[i] < closes[i+1]])
+        ups_5 = sum([1 for i in range(5) if closes[i] > closes[i+1]])
+        downs_5 = sum([1 for i in range(5) if closes[i] < closes[i+1]])
+        
+        # Momentum
+        momentum_recent = ((closes[0] - closes[5]) / closes[5]) * 100
+        
+        # Volatility check
+        avg_range = sum([highs[i] - lows[i] for i in range(10)]) / 10
+        current_range = highs[0] - lows[0]
+        if current_range > avg_range * 2.5:
+            return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "High volatility"}
+        
+        # === BUY Score ===
+        if m1_uptrend or (not m1_downtrend and ups_20 > downs_20):
+            score = 0
+            
+            if ups_20 >= 15:
+                score += 25
+            elif ups_20 >= 12:
+                score += 15
+            
+            if ups_10 >= 7:
+                score += 20
+            elif ups_10 >= 6:
+                score += 10
+            
+            if ups_5 >= 4:
+                score += 20
+            elif ups_5 >= 3:
+                score += 10
+            
+            if current > sma_5 > sma_10 > sma_20:
+                score += 15
+            elif current > sma_5 and current > sma_10:
+                score += 10
+            elif current > sma_5:
+                score += 5
+            
+            if momentum_recent > 0.01:
+                score += 10
+            elif momentum_recent > 0:
+                score += 5
+            
+            confidence = min(abs(momentum_recent) * 1000, 100)
+            
+            # Lower threshold for signal
+            if score >= 70:
+                signal_type = "BUY"
+            elif score >= 50:
+                signal_type = "WAIT"  # Frontend will show as weak buy
+            else:
+                signal_type = "WAIT"
+            
+            m1_badge = "✓M1"
+            print(f"[PREDICTION] BUY signal: score={score}, type={signal_type}, confidence={confidence:.1f}")
+            
+            return {
+                "type": signal_type,
+                "score": score,
+                "confidence": confidence,
+                "reason": f"{m1_badge} | Score:{score} | Up20:{ups_20} Up10:{ups_10} Up5:{ups_5}"
+            }
+        
+        # === SELL Score ===
+        if m1_downtrend or (not m1_uptrend and downs_20 > ups_20):
+            score = 0
+            
+            if downs_20 >= 15:
+                score += 25
+            elif downs_20 >= 12:
+                score += 15
+            
+            if downs_10 >= 7:
+                score += 20
+            elif downs_10 >= 6:
+                score += 10
+            
+            if downs_5 >= 4:
+                score += 20
+            elif downs_5 >= 3:
+                score += 10
+            
+            if current < sma_5 < sma_10 < sma_20:
+                score += 15
+            elif current < sma_5 and current < sma_10:
+                score += 10
+            elif current < sma_5:
+                score += 5
+            
+            if momentum_recent < -0.01:
+                score += 10
+            elif momentum_recent < 0:
+                score += 5
+            
+            confidence = min(abs(momentum_recent) * 1000, 100)
+            
+            # Lower threshold for signal
+            if score >= 70:
+                signal_type = "SELL"
+            elif score >= 50:
+                signal_type = "WAIT"  # Frontend will show as weak sell
+            else:
+                signal_type = "WAIT"
+            
+            m1_badge = "✓M1"
+            print(f"[PREDICTION] SELL signal: score={score}, type={signal_type}, confidence={confidence:.1f}")
+            
+            return {
+                "type": signal_type,
+                "score": score,
+                "confidence": confidence,
+                "reason": f"{m1_badge} | Score:{score} | Down20:{downs_20} Down10:{downs_10} Down5:{downs_5}"
+            }
+        
+        print("[PREDICTION] No trend detected after M1 analysis")
+        return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "No trend detected"}
+        
+    except Exception as e:
+        print(f"[PREDICTION] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"type": "WAIT", "score": 0, "confidence": 0, "reason": f"Error: {str(e)}"}

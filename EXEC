@@ -1,0 +1,11 @@
+@echo off
+echo BTC LOSS ZERO - EXECUCAO CONTINUA
+echo ================================
+echo.
+echo Iniciando agente BTC Loss Zero...
+echo Pressione Ctrl+C para parar
+echo.
+python btc_loss_zero_funcional.py
+echo.
+echo Agente encerrado!
+pause

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Gráfico Responsivo - Debug</title>
+    <style>
+        /* FORCING CACHE BUST + RESPONSIVE */
+        .chart-full #price-chart {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 200px !important;
+            max-height: 400px !important;
+            display: block !important;
+            border: 2px solid red !important; /* DEBUG: borda vermelha para ver se aplica */
+            background: #1a1a2e !important;
+        }
+
+        /* Desktop Large (1920px+) */
+        @media (min-width: 1920px) {
+            .chart-full #price-chart {
+                height: 350px !important;
+                max-height: 350px !important;
+            }
+        }
+
+        /* Desktop (1400px+) */
+        @media (min-width: 1400px) and (max-width: 1919px) {
+            .chart-full #price-chart {
+                height: 300px !important;
+                max-height: 300px !important;
+            }
+        }
+
+        /* Laptop (1200px+) */
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .chart-full #price-chart {
+                height: 280px !important;
+                max-height: 280px !important;
+            }
+        }
+
+        /* Tablet Horizontal (1024px+) */
+        @media (min-width: 1024px) and (max-width: 1199px) {
+            .chart-full #price-chart {
+                height: 250px !important;
+                max-height: 250px !important;
+            }
+        }
+
+        /* Tablet Vertical (768px+) */
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .chart-full #price-chart {
+                height: 220px !important;
+                max-height: 220px !important;
+            }
+        }
+
+        /* Mobile (480px+) */
+        @media (min-width: 480px) and (max-width: 767px) {
+            .chart-full #price-chart {
+                height: 180px !important;
+                max-height: 180px !important;
+            }
+        }
+
+        /* Mobile Small (<480px) */
+        @media (max-width: 479px) {
+            .chart-full #price-chart {
+                height: 150px !important;
+                max-height: 150px !important;
+            }
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #0d001a;
+            color: white;
+        }
+        
+        .chart-full {
+            width: 100%;
+            margin: 20px 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #B026FF;
+        }
+        
+        .info {
+            background: #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        canvas {
+            border: 2px solid red !important; /* DEBUG: verificar aplicação */
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste Gráfico Responsivo - Debug</h1>
+    
+    <div class="info">
+        <strong>Instruções:</strong><br>
+        1. Se você ver borda VERMELHA no canvas, o CSS está sendo aplicado<br>
+        2. Redimensione a janela para testar responsividade<br>
+        3. A altura deve mudar conforme o tamanho da tela
+    </div>
+    
+    <div class="chart-full">
+        <h3>Gráfico de Teste (Resolução: <span id="res-info"></span>)</h3>
+        <canvas id="price-chart" width="800" height="200"></canvas>
+    </div>
+    
+    <div class="info">
+        <strong>Resolução atual:</strong> <span id="screen-size"></span><br>
+        <strong>Largura do canvas:</strong> <span id="canvas-width"></span><br>
+        <strong>Altura do canvas:</strong> <span id="canvas-height"></span><br>
+        <strong>Altura CSS esperada:</strong> <span id="expected-height"></span>
+    </div>
+
+    <script>
+        // DEBUG: Forçar aplicação imediata
+        console.log('🎯 DEBUG: Script iniciado');
+        
+        function updateInfo() {
+            const canvas = document.getElementById('price-chart');
+            const ctx = canvas.getContext('2d');
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // Calcular altura esperada
+            let expectedHeight = 200; // default
+            if (screenWidth >= 1920) expectedHeight = 350;
+            else if (screenWidth >= 1400) expectedHeight = 300;
+            else if (screenWidth >= 1200) expectedHeight = 280;
+            else if (screenWidth >= 1024) expectedHeight = 250;
+            else if (screenWidth >= 768) expectedHeight = 220;
+            else if (screenWidth >= 480) expectedHeight = 180;
+            else expectedHeight = 150;
+            
+            // Atualizar informações
+            document.getElementById('screen-size').textContent = screenWidth + 'x' + screenHeight;
+            document.getElementById('canvas-width').textContent = canvas.style.width || 'Auto';
+            document.getElementById('canvas-height').textContent = canvas.style.height || 'Auto';
+            document.getElementById('expected-height').textContent = expectedHeight + 'px';
+            document.getElementById('res-info').textContent = screenWidth + 'px width';
+            
+            // Desenhar gráfico de teste
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grade
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                const y = (canvas.height / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Linha de preço simulada
+            ctx.strokeStyle = '#00FF41';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x < canvas.width; x++) {
+                const price = Math.sin(x * 0.02) * 50 + 100;
+                const y = canvas.height / 2 + price;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Texto informativo
+            ctx.fillStyle = '#FFD700';
+            ctx.font = '16px Arial';
+            ctx.fillText('Tela: ' + screenWidth + 'px | Altura esperada: ' + expectedHeight + 'px', 10, 30);
+            ctx.fillText('Canvas: ' + canvas.width + 'x' + canvas.height, 10, 50);
+        }
+        
+        // Forçar redimensionamento
+        function forceResize() {
+            console.log('🔄 Forçando redimensionamento...');
+            updateInfo();
+        }
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM carregado - Iniciando debug');
+            forceResize();
+        });
+        
+        // Event listeners
+        window.addEventListener('resize', function() {
+            console.log('📏 Redimensionando...');
+            forceResize();
+        });
+        
+        window.addEventListener('load', function() {
+            console.log('✅ Página completamente carregada');
+            forceResize();
+        });
+        
+        // Verificar estilos computados
+        setTimeout(function() {
+            const canvas = document.getElementById('price-chart');
+            const computedStyle = window.getComputedStyle(canvas);
+            console.log('🎨 Estilos computados do canvas:');
+            console.log('  Height:', computedStyle.height);
+            console.log('  Max-height:', computedStyle.maxHeight);
+            console.log('  Width:', computedStyle.width);
+        }, 1000);
+    </script>
+</body>
+</html>

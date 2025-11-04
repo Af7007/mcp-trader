@@ -49,7 +49,6 @@ print(f"  ✓ Tendência relaxada (1 de 3 velas)")
 print(f"  ✓ Fallback para momentum puro")
 print(f"\n{'='*70}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD FLEXÍVEL... ")
 
 # Criar agente
 agent = GoldLossZeroSimple(

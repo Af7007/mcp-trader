@@ -1,0 +1,99 @@
+# Análise de Discrepâncias - Banco de Dados e MagicNumber
+
+## RESUMO DA ANÁLISE
+
+### DESCOBERTAS PRINCIPAIS
+
+1. **Múltiplos Bancos de Dados Identificados:**
+   - `btc_trading_logs.db` - Principal (7.4MB, 90K+ ciclos)
+   - `trading_bot.db` - Banco genérico (69KB, 337 trades)
+   - `trading.db` - Banco de game (32KB, 255 registros)
+   - `src/trading_system.db` - Vazio
+
+2. **INCONSISTÊNCIA CRÍTICA:** 
+   - O banco `trading.db` **JÁ POSSUI** a coluna `magic_number` na tabela `game_history`
+   - Os bancos `btc_trading_logs.db` e `trading_bot.db` **NÃO POSSUEM** a coluna magicnumber
+
+3. **Discrepância Schema vs Código:**
+   - O `database.py` define um schema para tabela "trades" que não corresponde exatamente a nenhum banco existente
+   - Existe inconsistência nos nomes das colunas (ex: `entry_price` vs `open_price`)
+
+### ESTRUTURAS ATUAIS
+
+#### btc_trading_logs.db - TABELA trades
+```sql
+CREATE TABLE trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    cycle_id INTEGER,
+    symbol TEXT,
+    trade_type TEXT,
+    entry_price REAL,
+    sl_price REAL,
+    tp_price REAL,
+    volume REAL,
+    strength TEXT,
+    reason TEXT,
+    comment TEXT,
+    status TEXT,
+    exit_price REAL,
+    exit_reason TEXT,
+    profit_loss REAL,
+    agent_version TEXT
+);
+```
+
+#### trading_bot.db - TABELA trades
+```sql
+CREATE TABLE trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket INTEGER UNIQUE,
+    symbol TEXT NOT NULL,
+    type TEXT not null,
+    volume REAL not null,
+    open_price REAL not null,
+    close_price REAL,
+    open_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    close_time TIMESTAMP,
+    sl REAL,
+    tp REAL,
+    profit REAL,
+    comment TEXT,
+    status TEXT not null DEFAULT 'open'
+);
+```
+
+#### trading.db - TABELA game_history
+```sql
+CREATE TABLE game_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket INTEGER not null,
+    magic_number INTEGER not null,  -- JÁ EXISTE!
+    symbol TEXT not null,
+    type TEXT not null,
+    volume REAL not null,
+    open_price REAL,
+    close_price REAL,
+    sl REAL,
+    tp REAL,
+    profit REAL not null,
+    open_time TEXT,
+    close_time TEXT not null,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### PROBLEMAS IDENTIFICADOS
+
+1. **Inconsistência de Schema**: Cada banco usa um schema diferente
+2. **Falta de magicnumber**: Dois bancos principais não possuem a coluna
+3. **Nomenclatura Inconsistente**: Colunas diferentes para conceitos similares
+4. **Falta de Padronização**: Não existe um "banco principal" definido
+
+### RECOMENDAÇÕES
+
+1. **Padronizar um banco principal** (sugestão: `btc_trading_logs.db` pelo tamanho e atividade)
+2. **Adicionar magicnumber às tabelas que não possuem**
+3. **Unificar nomes de colunas** quando possível
+4. **Criar função de migração** para cada banco
+5. **Atualizar database.py** para refletir o schema correto

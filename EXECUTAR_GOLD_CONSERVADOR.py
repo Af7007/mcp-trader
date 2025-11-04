@@ -78,7 +78,6 @@ print(f"  ✓ SL mais flexível ($8 vs $6)")
 print(f"  ✓ ATR dinâmico em tempo real")
 print(f"\n{'='*70}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD CONSERVADOR... ")
 
 # Criar agente
 agent = GoldLossZeroSimple(

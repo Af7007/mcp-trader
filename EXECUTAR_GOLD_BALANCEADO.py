@@ -15,7 +15,7 @@ VOLUME = 0.02
 WORKER_INTERVAL = 0.5
 
 # GOLD SPECS
-POINT_VALUE_PER_LOT = 1.0
+POINT_VALUE_PER_LOT = 0.1  # CORRIGIDO: $0.10 por lote por ponto (XAUUSDc)
 ATR_MEDIO = 60
 
 # VALORES EM $ (mantendo os mesmos)
@@ -49,7 +49,6 @@ print(f"  ✓ Volume analysis mais permissivo")
 print(f"  ✓ Suporte/resistência flexível")
 print(f"\n{'='*70}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD BALANCEADO... ")
 
 # Criar agente
 agent = GoldLossZeroSimple(

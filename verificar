@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Verificação de problemas com Stop Loss
+"""
+
+import sqlite3
+from pathlib import Path
+
+def verificar_stop_loss():
+    """Verifica problemas com stop loss nos bancos de dados"""
+    
+    databases = [
+        ('btc_trading_logs.db', 'Banco BTC principal'),
+        ('trading_bot.db', 'Banco trading_bot'),
+        ('trading.db', 'Banco trading')
+    ]
+    
+    for db_file, description in databases:
+        if Path(db_file).exists():
+            print(f"\n{'='*60}")
+            print(f"VERIFICANDO STOP LOSS: {description} - {db_file}")
+            print('='*60)
+            
+            try:
+                conn = sqlite3.connect(db_file)
+                cursor = conn.cursor()
+                
+                # Verificar todas as tabelas
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = cursor.fetchall()
+                
+                if not tables:
+                    print(f"   Nenhuma tabela encontrada em {db_file}")
+                    conn.close()
+                    continue
+                
+                for table_name in tables:
+                    table = table_name[0]
+                    print(f"\n   TABELA: {table}")
+                    print("   " + "-"*50)
+                    
+                    # Verificar estrutura da tabela
+                    cursor.execute(f"PRAGMA table_info({table})")
+                    columns = cursor.fetchall()
+                    column_names = [col[1] for col in columns]
+                    
+                    print(f"   Colunas: {column_names}")
+                    
+                    # Verificar se tem coluna de stop loss
+                    sl_columns = [col for col in column_names if 'sl' in col.lower()]
+                    
+                    if sl_columns:
+                        print(f"   Colunas de Stop Loss encontradas: {sl_columns}")
+                        
+                        # Verificar valores de stop loss
+                        for sl_col in sl_columns:
+                            cursor.execute(f"SELECT COUNT(*), AVG({sl_col}), MIN({sl_col}), MAX({sl_col}) FROM {table} WHERE {sl_col} IS NOT NULL")
+                            stats = cursor.fetchone()
+                            count, avg_val, min_val, max_val = stats
+                            
+                            print(f"     -> {sl_col}:")
+                            print(f"         Registros com SL: {count}")
+                            print(f"         Média: ${avg_val:.2f}" if avg_val else "         Média: N/A")
+                            print(f"         Mínimo: ${min_val:.2f}" if min_val else "         Mínimo: N/A")
+                            print(f"         Máximo: ${max_val:.2f}" if max_val else "         Máximo: N/A")
+                            
+                            # Verificar se há valores muito baixos (como $0.6)
+                            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {sl_col} > 0 AND {sl_col} < 1")
+                            problem_count = cursor.fetchone()[0]
+                            
+                            if problem_count > 0:
+                                print(f"         *** ATENÇÃO: {problem_count} registros com SL < $1.0 ***")
+                                
+                                # Mostrar alguns exemplos
+                                cursor.execute(f"SELECT * FROM {table} WHERE {sl_col} > 0 AND {sl_col} < 1 ORDER BY id DESC LIMIT 5")
+                                examples = cursor.fetchall()
+                                
+                                print(f"         Exemplos de SL problemáticos:")
+                                for i, example in enumerate(examples, 1):
+                                    print(f"           {i}. ID: {example[0]}, SL: ${example[columns.index([col for col in columns if col[1] == sl_col][0])]:.2f}")
+                    
+                    else:
+                        print(f"   Nenhuma coluna de Stop Loss encontrada")
+                
+                conn.close()
+                
+            except Exception as e:
+                print(f"   Erro ao processar {db_file}: {e}")
+        else:
+            print(f"\n{'='*60}")
+            print(f"ARQUIVO NAO ENCONTRADO: {description} - {db_file}")
+            print('='*60)
+
+
+def verificar_magic_number():
+    """Verifica se o magic number está sendo salvo corretamente"""
+    
+    print(f"\n{'='*60}")
+    print("VERIFICANDO MAGIC NUMBER E STOP LOSS")
+    print('='*60)
+    
+    try:
+        conn = sqlite3.connect('trading_bot.db')
+        cursor = conn.cursor()
+        
+        # Verificar se a tabela trades tem magic_number e sl
+        cursor.execute("PRAGMA table_info(trades)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        
+        print(f"Colunas na tabela trades: {column_names}")
+        
+        if 'magic_number' in column_names:
+            print("Magic number está presente na tabela")
+            
+            # Verificar se trades recentes têm magic number
+            cursor.execute("SELECT COUNT(*) FROM trades WHERE magic_number IS NOT NULL")
+            count_with_magic = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM trades")
+            total_count = cursor.fetchone()[0]
+            
+            print(f"Trades com magic number: {count_with_magic}/{total_count}")
+            
+            # Verificar se trades com magic number têm stop loss correto
+            if 'sl' in column_names:
+                cursor.execute("SELECT COUNT(*) FROM trades WHERE magic_number IS NOT NULL AND sl < 1")
+                sl_problems = cursor.fetchone()[0]
+                
+                if sl_problems > 0:
+                    print(f"*** ATENÇÃO: {sl_problems} trades com magic number têm SL < $1.0 ***")
+        
+        conn.close()
+        
+    except Exception as e:
+        print(f"Erro na verificação: {e}")
+
+
+if __name__ == "__main__":
+    print("INICIANDO VERIFICACAO DE STOP LOSS")
+    print("="*60)
+    
+    verificar_stop_loss()
+    verificar_magic_number()
+    
+    print(f"\n{'='*60}")
+    print("VERIFICACAO CONCLUIDA")
+    print('='*60)

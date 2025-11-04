@@ -4,7 +4,10 @@
       "Bash(git add -A)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfix: Correct database schema mapping in dashboard\n\nFixed database field mapping issues in the trade dashboard. The actual\ndatabase schema uses different column names than initially assumed.\n\nSchema corrections:\n- profit → result (actual profit/loss value)\n- type → status (trade status field)\n- open_price → entry_price\n- close_price → removed (not used in schema)\n- sl → sl_price\n- tp → tp_price\n\nChanges:\n1. src/web/dashboard.py:\n   - Updated /api/stats to use result instead of profit\n   - Updated /api/trades to select correct columns\n   - Updated /api/performance to use result and status instead of type\n   - Updated /api/equity-curve for new field names\n   - Added NULL checks for optional fields\n\n2. src/web/templates/dashboard.html:\n   - Updated trade table to show actual database columns\n   - Fixed field mapping in JavaScript (entry_price, sl_price, tp_price, result)\n   - Updated column headers to match actual data\n   - Added status badge instead of type badge\n   - Added NULL check for timestamps\n\nResult:\n- All API endpoints now return 200 OK\n- Dashboard correctly displays 3 trades from database\n- Stats, charts, and table all working properly\n- No more 500 errors on API calls\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(python analise_sell_gold_detalhada.py:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(python analise_perdas.py:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

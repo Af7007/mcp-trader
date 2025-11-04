@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""
+Módulo de Banco de Dados para o Trading Chatbot.
+Usa SQLite para persistir informações sobre trades.
+Atualizado para incluir suporte ao magicnumber do MT5.
+"""
+
+import sqlite3
+import logging
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+DB_FILE = "trading_bot.db"
+logger = logging.getLogger(__name__)
+
+
+def get_db_connection():
+    """Cria e retorna uma conexão com o banco de dados."""
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def migrate_database():
+    """
+    Migra o banco de dados para a versão mais recente, adicionando colunas necessárias.
+    Esta função deve ser chamada na inicialização do sistema.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verificar se a coluna magic_number existe na tabela trades
+        cursor.execute("PRAGMA table_info(trades)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        
+        # Adicionar coluna magic_number se não existir
+        if 'magic_number' not in column_names:
+            cursor.execute("ALTER TABLE trades ADD COLUMN magic_number INTEGER")
+            logger.info("Coluna magic_number adicionada à tabela trades")
+        
+        # Adicionar coluna open_price se não existir (para compatibilidade)
+        if 'open_price' not in column_names and 'entry_price' in column_names:
+            cursor.execute("ALTER TABLE trades ADD COLUMN open_price REAL")
+            # Copiar dados de entry_price para open_price
+            cursor.execute("UPDATE trades SET open_price = entry_price WHERE open_price IS NULL")
+            logger.info("Coluna open_price adicionada e dados copiados de entry_price")
+        elif 'open_price' not in column_names and 'entry_price' not in column_names:
+            cursor.execute("ALTER TABLE trades ADD COLUMN open_price REAL")
+            logger.info("Coluna open_price adicionada à tabela trades")
+        
+        conn.commit()
+        conn.close()
+        logger.info("Migração do banco de dados concluída com sucesso.")
+        
+    except Exception as e:
+        logger.error(f"Erro na migração do banco de dados: {e}")
+
+
+def setup_database():
+    """
+    Cria as tabelas necessárias no banco de dados se elas não existirem.
+    Esta função deve ser chamada na inicialização do sistema.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Tabela para armazenar trades iniciados pela IA ou comandos
+        # Schema atualizado para incluir magicnumber
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket INTEGER UNIQUE,
+                magic_number INTEGER,  -- Número mágico do MT5
+                symbol TEXT NOT NULL,
+                type TEXT NOT NULL,  -- 'BUY' ou 'SELL'
+                volume REAL NOT NULL,
+                open_price REAL NOT NULL,
+                close_price REAL,
+                open_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                close_time TIMESTAMP,
+                sl REAL,  -- Stop Loss
+                tp REAL,  -- Take Profit
+                profit REAL,  -- Lucro/Prejuízo
+                comment TEXT,  -- Comentário/identificação do trade
+                status TEXT NOT NULL DEFAULT 'open'  -- 'open', 'closed'
+            );
+        """)
+
+        conn.commit()
+        conn.close()
+        logger.info("Banco de dados configurado com sucesso.")
+    except Exception as e:
+        logger.error(f"Erro ao configurar o banco de dados: {e}")
+
+
+def create_trade(ticket: int, symbol: str, volume: float, open_price: float, 
+                sl_price: Optional[float], tp_price: Optional[float], 
+                magic_number: Optional[int] = None, comment: str = None) -> Optional[int]:
+    """
+    Registra um novo trade no banco de dados.
+    Retorna o ID do trade inserido ou None em caso de falha.
+    
+    Args:
+        ticket: Ticket da operação MT5
+        symbol: Símbolo do ativo (ex: BTCUSDc)
+        volume: Volume da operação
+        open_price: Preço de abertura
+        sl_price: Preço do Stop Loss (opcional)
+        tp_price: Preço do Take Profit (opcional)
+        magic_number: Número mágico do MT5 (opcional)
+        comment: Comentário do trade (opcional)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO trades (ticket, magic_number, symbol, type, volume, open_price, sl, tp, comment) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (ticket, magic_number, symbol, 'BUY' if volume > 0 else 'SELL', abs(volume), open_price, sl_price, tp_price, comment))
+        trade_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"Novo trade registrado no DB: Ticket {ticket}, MagicNumber {magic_number}, ID {trade_id}")
+        return trade_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"Trade com ticket {ticket} já existe no banco de dados.")
+        return None
+    except Exception as e:
+        logger.error(f"Erro ao criar trade no DB: {e}")
+        return None
+
+
+def update_trade_status(ticket: int, status: str, profit: float = None, close_price: float = None, 
+                       close_time: datetime = None, comment: str = None):
+    """
+    Atualiza o status de um trade (ex: para 'closed').
+    
+    Args:
+        ticket: Ticket da operação
+        status: Novo status ('open', 'closed', 'cancelled')
+        profit: Lucro/Prejuízo da operação
+        close_price: Preço de fechamento
+        close_time: Data/hora de fechamento
+        comment: Comentário adicional
+    """
+    try:
+        if close_time is None:
+            close_time = datetime.now()
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Construir query dinamicamente baseado nos parâmetros fornecidos
+        updates = ["status = ?", "close_time = ?"]
+        params = [status, close_time]
+        
+        if profit is not None:
+            updates.append("profit = ?")
+            params.append(profit)
+            
+        if close_price is not None:
+            updates.append("close_price = ?")
+            params.append(close_price)
+            
+        if comment is not None:
+            updates.append("comment = ?")
+            params.append(f"{comment}")
+        
+        params.append(ticket)  # Adicionar ticket para a condição WHERE
+        
+        query = f"UPDATE trades SET {', '.join(updates)} WHERE ticket = ?"
+        cursor.execute(query, params)
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"Trade {ticket} atualizado para status '{status}' com profit {profit}.")
+    except Exception as e:
+        logger.error(f"Erro ao atualizar trade {ticket} no DB: {e}")
+
+
+def get_open_trades(magic_number: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Retorna uma lista de trades com status 'open'.
+    
+    Args:
+        magic_number: Filtrar por número mágico específico (opcional)
+    """
+    conn = get_db_connection()
+    
+    if magic_number is not None:
+        trades = conn.execute(
+            "SELECT * FROM trades WHERE status = 'open' AND magic_number = ?", 
+            (magic_number,)
+        ).fetchall()
+    else:
+        trades = conn.execute("SELECT * FROM trades WHERE status = 'open'").fetchall()
+    
+    conn.close()
+    return [dict(trade) for trade in trades]
+
+
+def get_trades_by_magic_number(magic_number: int) -> List[Dict[str, Any]]:
+    """
+    Retorna todos os trades para um número mágico específico.
+    
+    Args:
+        magic_number: Número mágico do MT5
+        
+    Returns:
+        Lista de trades ordenados por data de abertura
+    """
+    conn = get_db_connection()
+    trades = conn.execute(
+        "SELECT * FROM trades WHERE magic_number = ? ORDER BY open_time DESC", 
+        (magic_number,)
+    ).fetchall()
+    conn.close()
+    return [dict(trade) for trade in trades]
+
+
+def get_trade_by_ticket(ticket: int) -> Optional[Dict[str, Any]]:
+    """
+    Retorna um trade específico pelo ticket.
+    
+    Args:
+        ticket: Ticket da operação
+        
+    Returns:
+        Dados do trade ou None se não encontrado
+    """
+    conn = get_db_connection()
+    trade = conn.execute("SELECT * FROM trades WHERE ticket = ?", (ticket,)).fetchone()
+    conn.close()
+    return dict(trade) if trade else None
+
+
+def get_closed_trades(magic_number: Optional[int] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    Retorna trades fechados.
+    
+    Args:
+        magic_number: Filtrar por número mágico (opcional)
+        limit: Limite de resultados
+        
+    Returns:
+        Lista de trades fechados
+    """
+    conn = get_db_connection()
+    
+    if magic_number is not None:
+        trades = conn.execute(
+            "SELECT * FROM trades WHERE status = 'closed' AND magic_number = ? ORDER BY close_time DESC LIMIT ?", 
+            (magic_number, limit)
+        ).fetchall()
+    else:
+        trades = conn.execute(
+            "SELECT * FROM trades WHERE status = 'closed' ORDER BY close_time DESC LIMIT ?", 
+            (limit,)
+        ).fetchall()
+    
+    conn.close()
+    return [dict(trade) for trade in trades]
+
+
+def get_all_trades(magic_number: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Retorna todos os trades (abertos e fechados).
+    
+    Args:
+        magic_number: Filtrar por número mágico (opcional)
+        
+    Returns:
+        Lista de todos os trades
+    """
+    conn = get_db_connection()
+    
+    if magic_number is not None:
+        trades = conn.execute(
+            "SELECT * FROM trades WHERE magic_number = ? ORDER BY open_time DESC", 
+            (magic_number,)
+        ).fetchall()
+    else:
+        trades = conn.execute("SELECT * FROM trades ORDER BY open_time DESC").fetchall()
+    
+    conn.close()
+    return [dict(trade) for trade in trades]
+
+
+def delete_trade(ticket: int) -> bool:
+    """
+    Remove um trade do banco de dados.
+    
+    Args:
+        ticket: Ticket da operação
+        
+    Returns:
+        True se removido com sucesso, False caso contrário
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM trades WHERE ticket = ?", (ticket,))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if rows_affected > 0:
+            logger.info(f"Trade {ticket} removido do banco de dados.")
+            return True
+        else:
+            logger.warning(f"Trade {ticket} não encontrado para remoção.")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Erro ao remover trade {ticket} do DB: {e}")
+        return False
+
+
+def get_trading_statistics(magic_number: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Retorna estatísticas de trading para um número mágico específico.
+    
+    Args:
+        magic_number: Número mágico para filtrar (opcional)
+        
+    Returns:
+        Dicionário com estatísticas
+    """
+    conn = get_db_connection()
+    
+    if magic_number is not None:
+        # Estatísticas com filtro por magic_number
+        stats_query = """
+            SELECT 
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_trades,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_trades,
+                SUM(CASE WHEN status = 'closed' AND profit > 0 THEN 1 ELSE 0 END) as winning_trades,
+                SUM(CASE WHEN status = 'closed' AND profit < 0 THEN 1 ELSE 0 END) as losing_trades,
+                SUM(CASE WHEN status = 'closed' THEN profit ELSE 0 END) as total_profit,
+                AVG(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as avg_profit,
+                MAX(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as max_profit,
+                MIN(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as min_profit
+            FROM trades 
+            WHERE magic_number = ?
+        """
+        result = conn.execute(stats_query, (magic_number,)).fetchone()
+    else:
+        # Estatísticas gerais
+        stats_query = """
+            SELECT 
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_trades,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_trades,
+                SUM(CASE WHEN status = 'closed' AND profit > 0 THEN 1 ELSE 0 END) as winning_trades,
+                SUM(CASE WHEN status = 'closed' AND profit < 0 THEN 1 ELSE 0 END) as losing_trades,
+                SUM(CASE WHEN status = 'closed' THEN profit ELSE 0 END) as total_profit,
+                AVG(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as avg_profit,
+                MAX(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as max_profit,
+                MIN(CASE WHEN status = 'closed' THEN profit ELSE NULL END) as min_profit
+            FROM trades
+        """
+        result = conn.execute(stats_query).fetchone()
+    
+    conn.close()
+    
+    if result:
+        stats = dict(result)
+        # Calcular taxa de sucesso
+        if stats['closed_trades'] > 0:
+            stats['success_rate'] = (stats['winning_trades'] / stats['closed_trades']) * 100
+        else:
+            stats['success_rate'] = 0
+        
+        return stats
+    else:
+        return {}

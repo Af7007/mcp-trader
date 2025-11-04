@@ -333,7 +333,7 @@ def get_mt5_client(mcp_url: str = "http://localhost:8000") -> MT5MCPClient:
     Obtém a instância singleton do cliente MCP.
 
     Args:
-        mcp_url: URL do servidor MCP
+        mcp_url: URL do servidor MCP (não utilizado, mantido para compatibilidade)
 
     Returns:
         Instância do cliente MCP
@@ -341,7 +341,7 @@ def get_mt5_client(mcp_url: str = "http://localhost:8000") -> MT5MCPClient:
     global _mt5_client_instance
 
     if _mt5_client_instance is None:
-        _mt5_client_instance = MT5MCPClient(mcp_url)
-        logger.info("Nova instância do MT5 MCP Client criada")
+        _mt5_client_instance = MT5MCPClient()
+        logger.info("Nova instância do MT5 MCP Client criada (conexão direta)")
 
     return _mt5_client_instance

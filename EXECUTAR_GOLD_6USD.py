@@ -60,7 +60,6 @@ print(f"  Trailing Ativa:   {trailing_act_pontos:.0f} pts (ATR × {trailing_act_
 print(f"  Trailing Dist:    {trailing_dist_pontos:.0f} pts (ATR × {trailing_dist_mult:.2f})")
 print(f"\n{'='*60}\n")
 
-input("Pressione ENTER para iniciar o agente GOLD... ")
 
 # Criar agente
 agent = GoldLossZeroSimple(

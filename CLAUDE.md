@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT RULES
+
+**DO NOT:**
+- Create documentation files (.md) unless explicitly requested by user
+- Use emojis in code, comments, or print statements (causes Unicode encoding errors on Windows)
+- Use Unicode characters (checkmarks, arrows, etc.) - use ASCII only
+
+**ALWAYS:**
+- Use ASCII alternatives: [OK] instead of checkmark, -> instead of arrow, [WIN]/[LOSS] instead of emojis
+- Keep console output Windows-compatible (cp1252 encoding)
+
+**Game Layout (game_v2.html):**
+- Chart must be OUTSIDE and ABOVE main-grid (not inside left-panel)
+- Chart should be directly below top-bar for full width
+- Structure: top-bar -> chart-full -> main-grid
+- Add version query string (?v=X.X) to CSS/JS to force cache reload
+
 ## Project Overview
 
 This is a MetaTrader 5 (MT5) MCP Server that provides AI assistants access to the MetaTrader 5 trading platform through the Model Context Protocol. The project includes:
