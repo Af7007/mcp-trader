@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DIAGNÓSTICO: TRAILING STOP NO MT5
+================================
+
+Verifica se as modificações de SL estão sendo aplicadas no MT5.
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+def diagnosticar_trailing_mt5():
+    """
+    Diagnostica se o trailing está funcionando no MT5
+    """
+    print("="*70)
+    print("DIAGNÓSTICO: TRAILING STOP NO MT5")
+    print("="*70)
+    
+    try:
+        # Importar agentes
+        from src.agents.gold_adaptive_agent import GoldAdaptiveAgent
+        
+        print("Criando agente para diagnóstico...")
+        
+        # Criar agente simples
+        agent = GoldAdaptiveAgent(
+            symbol='XAUUSDc',
+            volume=0.03,
+            use_buy=True,
+            use_sell=True,
+            check_interval=2.0,  # 2s para diagnóstico
+            auto_tuning_enabled=False,
+        )
+        
+        print("Agente criado!")
+        
+        # Verificar posições ativas
+        print("\n1. VERIFICANDO POSIÇÕES ATIVAS:")
+        positions = agent.mt5.positions_get(symbol='XAUUSDc')
+        
+        if not positions:
+            print("   ❌ Nenhuma posição ativa encontrada")
+            print("   SOLUÇÃO: Executar agente para abrir posição primeiro")
+            return
+            
+        print(f"   ✅ {len(positions)} posição(ões) encontrada(s)")
+        
+        for pos in positions:
+            ticket = pos['ticket']
+            pos_type = "BUY" if pos['type'] == 0 else "SELL"
+            entry_price = pos['price_open']
+            current_price = pos['price_current']
+            current_sl = pos['sl']
+            
+            print(f"\n   POSIÇÃO #{ticket}:")
+            print(f"     Tipo: {pos_type}")
+            print(f"     Preço Entrada: ${entry_price:.2f}")
+            print(f"     Preço Atual: ${current_price:.2f}")
+            print(f"     SL Atual: ${current_sl:.2f}")
+            
+            # Calcular lucro
+            if pos_type == "BUY":
+                profit_points = (current_price - entry_price) / 0.001
+            else:
+                profit_points = (entry_price - current_price) / 0.001
+                
+            profit_dollars = profit_points * 0.003  # 0.03 lotes
+            print(f"     Lucro: {profit_points:.0f} pts (${profit_dollars:.2f})")
+            
+            # Testar modificação de SL
+            print(f"\n   TESTANDO MODIFICAÇÃO DE SL:")
+            
+            # Calcular novo SL (0.20 atrás do preço atual)
+            trailing_distance = 0.20
+            
+            if pos_type == "BUY":
+                new_sl = current_price - trailing_distance
+            else:
+                new_sl = current_price + trailing_distance
+                
+            print(f"     Novo SL calculado: ${new_sl:.2f}")
+            print(f"     Diferença: ${abs(new_sl - current_sl):.2f}")
+            
+            # Verificar se deve modificar
+            should_modify = False
+            if current_sl == 0 or (
+                (pos_type == "BUY" and new_sl > current_sl) or
+                (pos_type == "SELL" and new_sl < current_sl)
+            ):
+                should_modify = True
+                print(f"     ✅ Deve modificar SL")
+            else:
+                print(f"     ❌ Não deve modificar SL (não melhora)")
+                
+            if should_modify:
+                print(f"\n   EXECUTANDO MODIFICAÇÃO:")
+                print(f"     Ticket: {ticket}")
+                print(f"     Novo SL: ${new_sl:.2f}")
+                
+                try:
+                    # Tentar modificar
+                    result = agent.mt5.modify_position(ticket=ticket, sl=new_sl, tp=0)
+                    
+                    if result:
+                        print(f"     Resultado: {result}")
+                        
+                        if hasattr(result, 'retcode'):
+                            if result.retcode == 10009:
+                                print(f"     ✅ SUCESSO: SL modificado no MT5")
+                                
+                                # Verificar se realmente mudou
+                                time.sleep(1)
+                                updated_positions = agent.mt5.positions_get(ticket=ticket)
+                                if updated_positions:
+                                    updated_sl = updated_positions[0]['sl']
+                                    print(f"     SL verificado no MT5: ${updated_sl:.2f}")
+                                    
+                                    if abs(updated_sl - new_sl) < 0.01:
+                                        print(f"     ✅ CONFIRMADO: SL aplicado corretamente")
+                                    else:
+                                        print(f"     ❌ ERRO: SL não foi aplicado")
+                                else:
+                                    print(f"     ❌ ERRO: Posição não encontrada após modificação")
+                                    
+                            else:
+                                print(f"     ❌ ERRO MT5: Código {result.retcode}")
+                                print(f"     Descrição: {getattr(result, 'comment', 'N/A')}")
+                        else:
+                            print(f"     ❌ ERRO: Resultado sem retcode")
+                            
+                    else:
+                        print(f"     ❌ ERRO: Nenhum resultado retornado")
+                        
+                except Exception as e:
+                    print(f"     ❌ ERRO na modificação: {e}")
+        
+        print(f"\n" + "="*70)
+        print("DIAGNÓSTICO CONCLUÍDO")
+        print("="*70)
+        
+        # Verificar logs do MT5
+        print(f"\n2. VERIFICANDO LOGS DO MT5:")
+        try:
+            last_error = agent.mt5.get_last_error()
+            if last_error:
+                print(f"   Último erro MT5: {last_error}")
+            else:
+                print(f"   ✅ Nenhum erro recente no MT5")
+        except:
+            print(f"   ❌ Erro ao verificar logs do MT5")
+            
+    except ImportError as e:
+        print(f"❌ ERRO: {e}")
+        print("   Verificar se MT5 está conectado")
+        
+    except Exception as e:
+        print(f"❌ ERRO inesperado: {e}")
+
+def testar_trailing_simples():
+    """
+    Teste simples de trailing stop
+    """
+    print(f"\n" + "="*70)
+    print("TESTE SIMPLES DE TRAILING STOP")
+    print("="*70)
+    
+    try:
+        from src.agents.gold_adaptive_agent import GoldAdaptiveAgent
+        
+        agent = GoldAdaptiveAgent(
+            symbol='XAUUSDc',
+            volume=0.03,
+            use_buy=True,
+            use_sell=True,
+            check_interval=1.0,
+            auto_tuning_enabled=False,
+        )
+        
+        print("Agente criado para teste simples")
+        print("Para testar trailing:")
+        print("1. Aguarde uma posição abrir")
+        print("2. Quando lucro > $0.50, verifique se SL é modificado")
+        print("3. Use Ctrl+C para parar")
+        print("\nIniciando teste...")
+        
+        agent.run()
+        
+    except Exception as e:
+        print(f"❌ ERRO no teste: {e}")
+
+if __name__ == "__main__":
+    print("DIAGNÓSTICO DE TRAILING STOP NO MT5")
+    print("="*70)
+    
+    # Executar diagnóstico
+    diagnosticar_trailing_mt5()
+    
+    print(f"\n" + "="*70)
+    print("OPÇÕES:")
+    print("1. Executar teste simples: python diagnosticar_trailing_mt5.py --teste")
+    print("2. Verificar posições: python diagnosticar_trailing_mt5.py --posicoes")
+    print("="*70)

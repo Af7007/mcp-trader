@@ -95,54 +95,38 @@
             </div>
         </div>
 
-        <!-- Main Content Grid -->
-        <div class="main-grid">
-
-            <!-- Left Panel: Analysis -->
-            <div class="left-panel">
-                <div class="analysis-card">
+        <!-- Main Content Grid: 3 Colunas (Posições | Jogo | Histórico) -->
+        <div class="main-grid-3col">
+            
+            <!-- Left Column: Positions -->
+            <div class="grid-column">
+                <div class="positions-card">
                     <div class="card-header">
-                        <i class="fas fa-brain"></i>
-                        <span>ANÁLISE TÉCNICA</span>
+                        <i class="fas fa-list-check"></i>
+                        <span>POSIÇÕES</span>
+                        <span id="positions-count" class="badge">0</span>
                     </div>
-                    <div class="analysis-content">
-                        <div id="signal-indicator" class="signal-indicator">
-                            <i class="fas fa-circle-notch fa-spin"></i>
-                            <span>Analisando...</span>
-                        </div>
-                        <div class="score-display">
-                            <div class="score-label">SCORE</div>
-                            <div id="score-circle" class="score-circle">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" class="score-bg"/>
-                                    <circle id="score-progress" cx="50" cy="50" r="45" class="score-progress"/>
-                                </svg>
-                                <div id="score-value" class="score-value">0</div>
-                            </div>
-                        </div>
-                        <div id="analysis-details" class="analysis-details"></div>
-                    </div>
+                    <div id="positions-list" class="list-content"></div>
                 </div>
             </div>
 
-            <!-- Center Panel: BIG PROFIT DISPLAY -->
-            <div class="center-panel">
-                <div class="mega-display">
+            <!-- Center Column: Game Controls -->
+            <div class="grid-column">
+                <!-- Mega Display -->
+                <div class="mega-display-compact">
                     <div class="operation-status">
                         <i id="op-icon" class="fas fa-circle"></i>
                         <span id="op-status">AGUARDANDO</span>
                     </div>
-                    
-                    <div id="profit-mega" class="profit-mega">
+                    <div id="profit-mega" class="profit-mega-compact">
                         <span class="currency">$</span>
                         <span id="profit-value">0.00</span>
                     </div>
-                    
                     <div class="profit-label">OPERAÇÃO ATIVA</div>
                 </div>
-                
+
                 <!-- Trading Controls -->
-                <div class="trading-panel">
+                <div class="trading-panel-horizontal">
                     <div class="input-group">
                         <label><i class="fas fa-balance-scale"></i> LOTE</label>
                         <div class="input-stepper">
@@ -169,8 +153,31 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="action-buttons-mega">
+
+                <!-- Analysis Card COMPACTO -->
+                <div class="analysis-card-mini">
+                    <div class="card-header-mini">
+                        <i class="fas fa-brain"></i>
+                        <span>ANÁLISE</span>
+                    </div>
+                    <div class="analysis-content-mini">
+                        <div id="signal-indicator" class="signal-indicator">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            <span>Analisando...</span>
+                        </div>
+                        <div class="score-circle-tiny">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="score-bg"/>
+                                <circle id="score-progress" cx="50" cy="50" r="45" class="score-progress"/>
+                            </svg>
+                            <div id="score-value" class="score-value">0</div>
+                        </div>
+                        <div id="analysis-details" class="analysis-details-mini"></div>
+                    </div>
+                </div>
+
+                <!-- Buy/Sell Buttons -->
+                <div class="action-buttons-horizontal">
                     <button id="btn-buy" class="btn-mega btn-buy">
                         <i class="fas fa-arrow-trend-up"></i>
                         <span>COMPRAR</span>
@@ -187,17 +194,8 @@
                 </div>
             </div>
 
-            <!-- Right Panel: Positions + History -->
-            <div class="right-panel">
-                <div class="positions-card">
-                    <div class="card-header">
-                        <i class="fas fa-list-check"></i>
-                        <span>POSIÇÕES</span>
-                        <span id="positions-count" class="badge">0</span>
-                    </div>
-                    <div id="positions-list" class="list-content"></div>
-                </div>
-                
+            <!-- Right Column: History -->
+            <div class="grid-column">
                 <div class="history-card">
                     <div class="card-header">
                         <i class="fas fa-history"></i>
@@ -206,6 +204,7 @@
                     <div id="history-list" class="list-content"></div>
                 </div>
             </div>
+            
         </div>
     </div>
 

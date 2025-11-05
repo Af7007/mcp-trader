@@ -21,16 +21,7 @@ echo    - Hedge: DESATIVADO (foco em qualidade)
 echo.
 echo ============================================================
 echo.
-
-set /p CONFIRM="Confirma iniciar operacoes REAIS em OURO? (S/N): "
-if /i not "%CONFIRM%"=="S" (
-    echo.
-    echo Operacao cancelada.
-    pause
-    exit /b 0
-)
-
-echo.
+echo Iniciando...
 echo Verificando MT5...
 echo.
 

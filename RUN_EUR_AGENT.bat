@@ -17,14 +17,6 @@ echo.
 echo ============================================================
 echo.
 
-set /p CONFIRM="Confirma iniciar operacoes REAIS em EURUSD? (S/N): "
-if /i not "%CONFIRM%"=="S" (
-    echo.
-    echo Operacao cancelada.
-    pause
-    exit /b 0
-)
-
 echo.
 echo Verificando MT5...
 echo.

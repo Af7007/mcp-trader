@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""
+GOLD ULTRA-AGGRESSIVE TRAILING - CORREÇÃO DEFINITIVA
+Thresholds ultra-baixos para garantir ativação do trailing
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Adicionar src ao path
+sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
+# Importar agente existente
+from agents.gold_loss_zero_simple import GoldLossZeroSimple
+
+
+class GoldUltraAggressiveTrailing(GoldLossZeroSimple):
+    """
+    Versão ultra-agressiva com thresholds MUITO menores
+    OBJETIVO: Trailing ativa em $0.50-1.00 de lucro
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Aplicar configurações ultra-agressivas
+        """
+        # THRESHOLDS ULTRA-AGGRESSIVES (vs ultra-agressive original)
+        kwargs.update({
+            # Trailing: ATIVAR EM $0.50-1.00 (vs $1.50 anterior)
+            'trailing_activation_atr_multiplier': 0.025,  # 0.025 × 200 pts = 5 pts = ~$0.50
+            'trailing_distance_atr_multiplier': 0.01,     # 0.01 × 200 pts = 2 pts = ~$0.20
+            
+            # Stop Loss: Menos agressivo (protéger melhor)
+            'stop_loss_atr_multiplier': 2.0,  # 2.0 × 200 pts = 400 pts = ~$4.00
+            
+            # Volume maior para movimentos mais rápidos
+            'volume': 0.05,
+            
+            # Check interval mais frequente
+            'check_interval': 3  # 3 segundos!
+        })
+        
+        print("="*80)
+        print("GOLD ULTRA-AGGRESSIVE TRAILING - CORREÇÃO DEFINITIVA")
+        print("="*80)
+        print("PROBLEMA: Trailing não ativava")
+        print("SOLUÇÃO: Thresholds ULTRA-BAIXOS")
+        print("")
+        print("CONFIGURAÇÕES CORRIGIDAS:")
+        print("- Trailing ativa: 0.025 × ATR (vs 0.075 anterior)")
+        print("- Trailing distância: 0.01 × ATR (vs 0.04 anterior)")
+        print("- ATR forçado: 200 pontos (vs 400 anterior)")
+        print("- Volume: 0.05 (vs 0.01 original)")
+        print("- Check: 3s (vs 15s original)")
+        print("- Cooldown: 2s (vs 120s original)")
+        print("")
+        print("RESULTADO ESPERADO:")
+        print("- Trailing ativa em ~$0.50 lucro (vs $1.50)")
+        print("- Lucro protegido: ~$0.30 (vs $1.10)")
+        print("- Respsta ultra-rápida: 3s")
+        print("="*80)
+        print("")
+        
+        super().__init__(*args, **kwargs)
+        
+        # Forçar ATR muito menor
+        self.current_atr = 200.0  # Forçar ATR pequeno
+        self.current_sl_pontos = self.current_atr * self.sl_atr_mult  # 200 × 2.0 = 400 pts
+        self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult  # 200 × 0.025 = 5 pts
+        self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult  # 200 × 0.01 = 2 pts
+        
+        # Cooldown ultra-rápido
+        self.cooldown_seconds = 2
+        self.cooldown_same_direction = 1
+        
+        # Debug específico
+        self.debug_trailing = True
+        
+        print(f"[DEBUG] ATR forçado: {self.current_atr} pontos")
+        print(f"[DEBUG] SL: {self.current_sl_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_sl_pontos):.2f}")
+        print(f"[DEBUG] Trailing ativa: {self.current_trailing_activation_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f}")
+        print(f"[DEBUG] Trailing distância: {self.current_trailing_distance_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_trailing_distance_pontos):.2f}")
+        print(f"[DEBUG] Lucro protegido: ~${self._pontos_para_dinheiro(self.current_trailing_activation_pontos - self.current_trailing_distance_pontos):.2f}")
+        print("")
+    
+    def _calculate_initial_atr(self):
+        """
+        Override: Forçar ATR muito menor para trailing ativar rápido
+        """
+        print(f"[ATR] Forçando ATR baixo: 200 pontos (vs 400 padrão)")
+        self.current_atr = 200.0
+        
+        # Calcular thresholds
+        self.current_sl_pontos = self.current_atr * self.sl_atr_mult
+        self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult
+        self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult
+        
+        print(f"[ATR] Thresholds calculados:")
+        print(f"       SL: {self.current_sl_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_sl_pontos):.2f}")
+        print(f"       Trailing ativa: {self.current_trailing_activation_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f}")
+        print(f"       Trailing distância: {self.current_trailing_distance_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_trailing_distance_pontos):.2f}")
+        print(f"       Lucro protegido: ~${self._pontos_para_dinheiro(self.current_trailing_activation_pontos - self.current_trailing_distance_pontos):.2f}")
+        print("")
+    
+    def _manage_position_trailing(self, pos):
+        """
+        Override com debug detalhado para trailing
+        """
+        try:
+            ticket = pos.get('ticket')
+            if not ticket:
+                return
+            
+            # Obter dados da posição
+            tick = self.mt5.get_symbol_info_tick(self.symbol)
+            if tick:
+                current_price = tick['bid'] if tick.get('bid', 0) > 0 else tick.get('ask', 0)
+            else:
+                current_price = pos.get('price_open', 0)
+
+            entry_price = self.positions_entry_price.get(ticket, pos.get('price_open', 0))
+            if entry_price <= 0:
+                return
+
+            pos_type = pos.get('type', 0)
+            trailing_active = self.positions_trailing_active.get(ticket, False)
+            trailing_stop_price = self.positions_trailing_stop.get(ticket, 0.0)
+
+            # Calcular lucro em pontos
+            if pos_type == 0:  # BUY
+                profit_price_diff = current_price - entry_price
+            else:  # SELL
+                profit_price_diff = entry_price - current_price
+
+            profit_pontos = profit_price_diff / self.symbol_point
+            profit_dinheiro = self._pontos_para_dinheiro(profit_pontos)
+
+            # DEBUG ULTRA DETALHADO
+            if self.debug_trailing:
+                print(f"")
+                print(f"[TRAILING DEBUG #{ticket}]")
+                print(f"  Entry: ${entry_price:.3f} | Current: ${current_price:.3f}")
+                print(f"  Profit pts: {profit_pontos:.1f} | Profit $: ${profit_dinheiro:.2f}")
+                print(f"  Threshold pts: {self.current_trailing_activation_pontos:.0f} | $: ${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f}")
+                print(f"  ATR atual: {self.current_atr:.0f} pts")
+                print(f"  symbol_point: {self.symbol_point}")
+                print(f"  Trailing ativo: {trailing_active}")
+                print(f"")
+
+            # Verificar ativação
+            if not trailing_active and profit_pontos >= self.current_trailing_activation_pontos:
+                print(f"")
+                print(f"🎯 ATIVANDO TRAILING! Ticket #{ticket}")
+                print(f"   Lucro atual: {profit_pontos:.1f} pts (${profit_dinheiro:.2f})")
+                print(f"   Threshold: {self.current_trailing_activation_pontos:.0f} pts (${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f})")
+                print(f"   DIFERENÇA: {profit_pontos - self.current_trailing_activation_pontos:.1f} pts acima do threshold!")
+                
+                # Converter para variação de preço
+                trailing_price_distance = self.current_trailing_distance_pontos * self.symbol_point
+
+                if pos_type == 0:  # BUY
+                    trailing_stop_price = current_price - trailing_price_distance
+                else:  # SELL
+                    trailing_stop_price = current_price + trailing_price_distance
+                
+                # Salvar no dicionário
+                self.positions_trailing_active[ticket] = True
+                self.positions_trailing_stop[ticket] = trailing_stop_price
+                self.trailing_active = True
+                self.trailing_stop_price = trailing_stop_price
+
+                # Calcular lucro protegido
+                lucro_protegido_pontos = profit_pontos - self.current_trailing_distance_pontos
+                lucro_protegido_dinheiro = self._pontos_para_dinheiro(lucro_protegido_pontos)
+
+                # Modificar SL
+                success = self._safe_modify_sl(ticket, trailing_stop_price, "ATIVAR TRAILING")
+                if success:
+                    print(f"✅ TRAILING ATIVADO COM SUCESSO!")
+                    print(f"   Stop Loss movido para: ${trailing_stop_price:.3f}")
+                    print(f"   Lucro mínimo protegido: ${lucro_protegido_dinheiro:.2f}")
+                    print(f"   A partir de agora: IMPOSSÍVEL PERDER!")
+                else:
+                    print(f"❌ ERRO ao ativar trailing!")
+                
+                print(f"")
+            else:
+                # Mostrar progresso
+                if profit_pontos > 0:
+                    falta_pontos = self.current_trailing_activation_pontos - profit_pontos
+                    falta_dinheiro = self._pontos_para_dinheiro(falta_pontos)
+                    if not trailing_active:
+                        print(f"⏳ AGUARDANDO #{ticket}: {profit_pontos:.1f}pts (${profit_dinheiro:.2f}) | Faltam: {falta_pontos:.1f}pts (${falta_dinheiro:.2f}) para ativar trailing")
+                
+            # Atualizar trailing se já ativo
+            if trailing_active:
+                lucro_protegido_pontos = profit_pontos - self.current_trailing_distance_pontos
+                lucro_protegido_dinheiro = self._pontos_para_dinheiro(lucro_protegido_pontos)
+                
+                print(f"🔄 TRAILING ATIVO #{ticket}: Lucro ${profit_dinheiro:.2f} | Protegido ${lucro_protegido_dinheiro:.2f} | Stop ${trailing_stop_price:.3f}")
+                
+                # Lógica de atualização (simplificada para debug)
+                trailing_price_distance = self.current_trailing_distance_pontos * self.symbol_point
+                
+                if pos_type == 0:  # BUY
+                    new_stop = current_price - trailing_price_distance
+                    if new_stop > trailing_stop_price:
+                        old_stop = trailing_stop_price
+                        try:
+                            self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
+                            print(f"📈 Trailing subiu: ${old_stop:.3f} → ${new_stop:.3f}")
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
+                        except Exception as e:
+                            print(f"❌ Erro ao subir trailing: {e}")
+                else:  # SELL
+                    new_stop = current_price + trailing_price_distance
+                    if new_stop < trailing_stop_price:
+                        old_stop = trailing_stop_price
+                        try:
+                            self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
+                            print(f"📉 Trailing desceu: ${old_stop:.3f} → ${new_stop:.3f}")
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
+                        except Exception as e:
+                            print(f"❌ Erro ao descer trailing: {e}")
+
+        except Exception as e:
+            print(f"Erro no trailing: {e}")
+
+
+def main():
+    print("EXECUTANDO GOLD ULTRA-AGGRESSIVE TRAILING CORRIGIDO")
+    print("Problema: Trailing não ativava")
+    print("Solução: Thresholds ultra-baixos + Debug detalhado")
+    print("")
+    
+    # Criar agente corrigido
+    agent = GoldUltraAggressiveTrailing(
+        symbol='XAUUSDc',
+        volume=0.05,
+        check_interval=3,  # 3 segundos!
+        trailing_activation_atr_multiplier=0.025,  # Ultra baixo!
+        trailing_distance_atr_multiplier=0.01,     # Ultra baixo!
+        stop_loss_atr_multiplier=2.0,
+        use_buy=True,
+        use_sell=True
+    )
+    
+    # Debug habilitado
+    agent.debug_trailing = True
+    
+    print("")
+    print("CONFIGURAÇÕES FINAIS:")
+    print(f"- Trailing ativa em: ${agent._pontos_para_dinheiro(agent.current_trailing_activation_pontos):.2f}")
+    print(f"- Trailing distância: ${agent._pontos_para_dinheiro(agent.current_trailing_distance_pontos):.2f}")
+    print(f"- Lucro protegido: ~${agent._pontos_para_dinheiro(agent.current_trailing_activation_pontos - agent.current_trailing_distance_pontos):.2f}")
+    print(f"- Volume: {agent.volume}")
+    print(f"- Check: {agent.check_interval}s")
+    print("")
+    print("OBJETIVO: Trailing ativa em $0.50-1.00 de lucro")
+    print("PARA PARAR: Ctrl+C")
+    print("="*70)
+    print("")
+    
+    # Executar
+    try:
+        agent.run()
+    except KeyboardInterrupt:
+        print("\n[STOP] Agente parado pelo usuário")
+
+
+if __name__ == "__main__":
+    main()

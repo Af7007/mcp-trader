@@ -1,133 +1,73 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Debug do cálculo de ATR para Gold Loss Zero
-Verifica por que o ATR está retornando 0
+Debug: por que ATR esta tao alto?
 """
 
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
 
-from core.mt5_direct_client import get_mt5_client
+from src.core.mt5_direct_client import get_mt5_client
 
-def debug_atr_calculation():
-    """
-    Testa o cálculo de ATR diretamente
-    """
-    print("DEBUG DO CÁLCULO DE ATR")
-    print("="*50)
+print("="*80)
+print("DEBUG ATR - POR QUE TVALORES TÃO ALTOS?")
+print("="*80)
 
-    # Conectar ao MT5
-    mt5 = get_mt5_client()
-    if not mt5:
-        print("[ERRO] Não foi possível conectar ao MT5")
-        return
+# Conectar MT5
+mt5 = get_mt5_client()
 
-    symbol = "XAUUSDc"
-    print(f"Testando ATR para {symbol}")
+# Obter dados M5
+print("\n[OBTENDO DADOS M5]")
+rates = mt5.copy_rates_from_pos(
+    symbol="XAUUSDc",
+    timeframe="M5",
+    start_pos=0,
+    count=20
+)
 
-    # Obter dados históricos
-    try:
-        rates = mt5.copy_rates_from_pos(
-            symbol=symbol,
-            timeframe="M5",
-            start_pos=0,
-            count=20  # 100 minutos de histórico
+print(f"Candles obtidos: {len(rates)}")
+
+if rates and len(rates) >= 14:
+    print(f"\nPrimeiros 14 candles M5:")
+    print(f"{'#':>3} {'Open':>10} {'High':>10} {'Low':>10} {'Close':>10} {'TR':>10}")
+    print("-"*60)
+    
+    true_ranges = []
+    for i in range(1, min(14, len(rates))):
+        high = rates[i-1]['high']
+        low = rates[i-1]['low']
+        prev_close = rates[i]['close']
+        
+        tr = max(
+            high - low,
+            abs(high - prev_close),
+            abs(low - prev_close)
         )
-
-        if rates is None or len(rates) == 0:
-            print("[ERRO] Não foi possível obter dados históricos")
-            return
-
-        print(f"[OK] Obtidos {len(rates)} candles de M5")
-
-        # Mostrar alguns dados
-        print("Últimos 5 candles:")
-        for i, rate in enumerate(rates[:5]):
-            print(f"  {i+1}: Close=${rate['close']:.2f}, High=${rate['high']:.2f}, Low=${rate['low']:.2f}")
-
-        # Calcular ATR manualmente
-        if len(rates) >= 14:
-            true_ranges = []
-            for i in range(1, min(14, len(rates))):
-                high = rates[i-1]['high']
-                low = rates[i-1]['low']
-                prev_close = rates[i]['close']
-
-                tr = max(
-                    high - low,
-                    abs(high - prev_close),
-                    abs(low - prev_close)
-                )
-                true_ranges.append(tr)
-                print(f"  TR[{i}]: {tr:.4f}")
-
-            # ATR em preço
-            atr_preco = sum(true_ranges) / len(true_ranges)
-            print(f"ATR em preço: {atr_preco:.4f}")
-
-            # Obter symbol info para converter para pontos
-            symbol_info = mt5.get_symbol_info(symbol)
-            if symbol_info:
-                symbol_point = symbol_info.get('point', 0.001)
-                print(f"Symbol point: {symbol_point}")
-
-                # ATR em pontos MT5
-                atr_pontos = atr_preco / symbol_point
-                print(f"ATR em pontos MT5: {atr_pontos:.0f}")
-
-                # ATR mínimo para Gold
-                atr_final = max(atr_pontos, 60000.0)
-                print(f"ATR final (com mínimo): {atr_final:.0f}")
-            else:
-                print("[ERRO] Não foi possível obter symbol info")
-        else:
-            print(f"[ERRO] Poucos dados históricos: {len(rates)} < 14")
-
-    except Exception as e:
-        print(f"[ERRO] Exceção ao calcular ATR: {e}")
-
-def test_agent_atr():
-    """
-    Testa o cálculo de ATR dentro do agente
-    """
-    print("\nTESTE DO ATR NO AGENTE")
-    print("="*50)
-
-    from agents.gold_loss_zero_simple import GoldLossZeroSimple
-
-    agent = GoldLossZeroSimple(
-        symbol="XAUUSDc",
-        volume=0.02,
-        check_interval=15,
-        trailing_activation_atr_multiplier=0.2
-    )
-
-    print(f"ATR calculado pelo agente: {agent.current_atr}")
-
-    # Forçar recálculo
-    print("Forçando recálculo de ATR...")
-    rates = agent.mt5.copy_rates_from_pos(
-        symbol=agent.symbol,
-        timeframe="M5",
-        start_pos=0,
-        count=20
-    )
-
-    if rates and len(rates) >= 14:
-        agent.current_atr = agent._calculate_atr_simple(rates[:14])
-        print(f"ATR recalculado: {agent.current_atr}")
-
-        # Calcular thresholds
-        trailing_activation_pontos = agent.current_atr * agent.trailing_activation_mult
-        trailing_activation_dinheiro = agent._pontos_para_dinheiro(trailing_activation_pontos)
-
-        print(f"Trailing activation pontos: {trailing_activation_pontos:.0f}")
-        print(f"Trailing activation dinheiro: ${trailing_activation_dinheiro:.2f}")
+        true_ranges.append(tr)
+        
+        print(f"{i:>3} {rates[i-1]['open']:>10.5f} {high:>10.5f} {low:>10.5f} {prev_close:>10.5f} {tr:>10.5f}")
+    
+    # Calcular ATR
+    atr_preco = sum(true_ranges) / len(true_ranges)
+    atr_pontos = atr_preco / 0.001  # symbol_point
+    
+    print(f"\n[CALCULO ATR]")
+    print(f"  True Ranges: {[f'{t:.5f}' for t in true_ranges[:3]]}...")
+    print(f"  Media True Range (preco): ${atr_preco:.5f}")
+    print(f"  ATR em pontos (÷ 0.001): {atr_pontos:.0f} pontos")
+    print(f"  ATR minimo: {max(atr_pontos, 400.0):.0f} pontos")
+    
+    print(f"\n[PROBLEMA?]")
+    if atr_pontos > 1000:
+        print(f"  WARNING: ATR muito alto ({atr_pontos:.0f})!")
+        print(f"  Isso pode significar:")
+        print(f"    1. High volatilidade no momento")
+        print(f"    2. Problema no cálculo de True Range")
+        print(f"    3. Dados com gap/abertura grande")
     else:
-        print("[ERRO] Não foi possível obter dados para recálculo")
+        print(f"  ATR normal: {atr_pontos:.0f} pontos ✓")
+        
+else:
+    print(f"[ERRO] Nao conseguiu obter dados M5 suficientes")
 
-if __name__ == "__main__":
-    debug_atr_calculation()
-    test_agent_atr()
+print("\n" + "="*80)

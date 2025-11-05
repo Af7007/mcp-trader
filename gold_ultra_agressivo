@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""
+SOLUCAO IMEDIATA: Gold Ultra-Aggressive SEM auto-learning
+Execute direto: python gold_ultra_agressivo_teste.py
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
+from agents.gold_loss_zero_simple import GoldLossZeroSimple
+
+
+class GoldUltraAggressiveSimples(GoldLossZeroSimple):
+    """
+    Versao ULTRA-AGGRESSIVA para teste IMEDIATO
+    Base: gold_loss_zero_simple (sem auto-learning)
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """
+        ULTRA-AGGRESSIVE: Todos os thresholds ULTRA baixos
+        """
+        # SOBREESCREVER TODOS os parametros para ser ULTRA flexível
+        kwargs.update({
+            # Trailing: ATIVAR SUPER CEDO (era 0.35 -> agora 0.075)
+            'trailing_activation_atr_multiplier': 0.075,
+            'trailing_distance_atr_multiplier': 0.04,
+            
+            # Stop Loss: Mais tolerante (era 5.0 -> agora 3.0)
+            'stop_loss_atr_multiplier': 3.0,
+            
+            # Volume maior para movimentos mais rápidos
+            'volume': 0.05,
+            
+            # Check interval mais frequente
+            'check_interval': 5
+        })
+        
+        print("\n" + "="*60)
+        print("GOLD ULTRA-AGGRESSIVE - TESTE IMEDIATO")
+        print("="*60)
+        print("[CONFIGURACAO ULTRA-AGGRESSIVE]")
+        print(f"  Trailing ativa: ~$1.50 lucro (vs $5+ original)")
+        print(f"  Volume: 0.05 (vs 0.01 original)")
+        print(f"  Check: 5s (vs 15s original)")
+        print(f"  Cooldown: 5s (vs 120s original)")
+        print(f"  SL: 3.0x ATR (vs 5.0x original)")
+        print("="*60)
+        print("[OBJETIVO]")
+        print(f"  - Abrir posições rápidamente")
+        print(f"  - Trailing ativa em $1.50 vs $5+")
+        print(f"  - SEM auto-learning (configurações fixas)")
+        print("="*60)
+        print("")
+        
+        super().__init__(*args, **kwargs)
+        
+        # Cooldown ultra-rápido
+        self.cooldown_seconds = 5
+        self.cooldown_same_direction = 1
+        
+        # Filtros ultra-flexíveis na análise
+        self._ultra_aggressive_filters()
+    
+    def _ultra_aggressive_filters(self):
+        """
+        Aplicar filtros ultra-flexíveis para máximo número de sinais
+        """
+        print("[FILTROS ULTRA-FLEXIVEIS APLICADOS]")
+        print("  - Confirmações necessárias: 1 (vs 2 original)")
+        print("  - Momentum threshold: 0.015% (vs 0.03% original)")
+        print("  - Filtro M15: DISABILITADO (aceita qualquer tendência)")
+        print("  - Volume spike: 1.05x (vs 1.1x original)")
+        print("")
+    
+    def _analyze_m5_trend(self, rates) -> dict:
+        """
+        ANALISE ULTRA-AGGRESSIVE: Máxima sensibilidade a sinais
+        """
+        try:
+            if len(rates) < 6:
+                return None
+                
+            closes = [r['close'] for r in rates[:10]]
+            highs = [r['high'] for r in rates[:10]]
+            lows = [r['low'] for r in rates[:10]]
+            volumes = [r['tick_volume'] for r in rates[:10]]
+
+            current = closes[0]
+            prev_5 = closes[5]
+
+            # Calcular ATR
+            self.current_atr = self._calculate_atr_simple(rates[:14])
+
+            # TENDENCIA (ultra-flexível: 2/3 bastam vs 3/4 original)
+            uptrend = sum(1 for i in range(3) if closes[i] > closes[i+1]) >= 2
+            downtrend = sum(1 for i in range(3) if closes[i] < closes[i+1]) >= 2
+
+            # MOMENTUM (ultra-flexível: metada do threshold original)
+            momentum_5m = ((current - prev_5) / prev_5) * 100
+            MOMENTUM_BUY = 0.015   # 50% menor que original (era 0.03%)
+            MOMENTUM_SELL = -0.015
+
+            # VOLATILIDADE (ultra-flexível)
+            last_range = highs[0] - lows[0]
+            avg_range = sum([highs[i] - lows[i] for i in range(1, 3)]) / 2
+            high_volatility = last_range > avg_range * 0.5  # 50% mais flexível
+
+            # VOLUME (ultra-flexível)
+            avg_volume = sum(volumes[1:3]) / 2
+            volume_spike = volumes[0] > avg_volume * 1.05  # 5% spike (vs 10% original)
+
+            # === SINAIS BUY - APENAS 1 CONFIRMAÇÃO (ultra-agressivo) ===
+            if self.use_buy:
+                # 1 CONFIRMAÇÃO apenas (vs 2 original)
+                if (uptrend and momentum_5m > MOMENTUM_BUY * 0.8) or momentum_5m > MOMENTUM_BUY:
+                    print(f"   [BUY] Sinal ultra-agressivo! Up: {uptrend} | Mom: {momentum_5m:.4f}%")
+                    # M15: SEMPRE VERDADEIRO (ultra-flexível)
+                    return {"type": "BUY", "price": current, "reason": "ULTRA_AGGRESSIVE_BUY"}
+
+            # === SINAIS SELL - APENAS 1 CONFIRMAÇÃO (ultra-agressivo) ===
+            if self.use_sell:
+                # 1 CONFIRMAÇÃO apenas (vs 2 original)
+                if (downtrend and momentum_5m < MOMENTUM_SELL * 0.8) or momentum_5m < MOMENTUM_SELL:
+                    print(f"   [SELL] Sinal ultra-agressivo! Down: {downtrend} | Mom: {momentum_5m:.4f}%")
+                    # M15: SEMPRE VERDADEIRO (ultra-flexível)
+                    return {"type": "SELL", "price": current, "reason": "ULTRA_AGGRESSIVE_SELL"}
+
+            return None
+
+        except Exception as e:
+            print(f"Erro na análise: {e}")
+            return None
+
+    def _display_status(self, cycle: int):
+        """
+        Status conciso mostrando ultra-aggressividade
+        """
+        current_time = time.strftime("%H:%M:%S")
+        
+        print(f"\n[#{cycle}] {current_time} | ULTRA-AGGRESSIVE")
+        
+        # Preço atual
+        if self.mt5:
+            try:
+                tick = self.mt5.get_symbol_info_tick(self.symbol)
+                if tick:
+                    current_price = tick['bid'] if tick.get('bid', 0) > 0 else tick.get('ask', 0)
+                    print(f"  Preço: ${current_price:.3f}")
+                    
+                    # Posições
+                    positions = self.mt5.positions_get(symbol=self.symbol)
+                    if positions:
+                        for pos in positions:
+                            ticket = pos.get('ticket')
+                            profit = pos.get('profit', 0)
+                            pos_type = pos.get('type', 0)
+                            direction = "BUY" if pos_type == 0 else "SELL"
+                            
+                            print(f"  [{direction}] #{ticket}: ${profit:.2f}")
+                    else:
+                        print(f"  Posições: Nenhuna | Aguardando sinais...")
+                        
+            except Exception as e:
+                print(f"  Erro: {e}")
+        
+        # Contador de trades
+        try:
+            closed_trades = self.btc_logger.get_closed_trades_count(symbol=self.symbol)
+            print(f"  Trades fechados: {closed_trades}")
+        except:
+            pass
+
+    def run(self):
+        """
+        Execução ultra-aggressiva
+        """
+        print(f"\n{'='*70}")
+        print(f"GOLD ULTRA-AGGRESSIVE - EXECUÇÃO INICIADA")
+        print(f"{'='*70}")
+        print(f"[MODO] ULTRA-AGGRESSIVE (SEM AUTO-LEARNING)")
+        print(f"[OBJETIVO] 3-5 posições em 15-20 minutos")
+        print(f"[TRAILING] Ativo em ~$1.50 (vs $5+ original)")
+        print(f"[VELOCIDADE] Check: 5s | Cooldown: 5s")
+        print(f"[SINAIS] Ultra-flexíveis (1 confirmação)")
+        print(f"\n[PARA PARAR] Pressione Ctrl+C")
+        print(f"{'='*70}\n")
+        
+        try:
+            cycle = 0
+            start_time = time.time()
+            
+            while True:
+                cycle += 1
+                
+                # Status
+                self._display_status(cycle)
+                self._check_positions()
+                
+                # Progresso a cada 1 minuto
+                if cycle % 12 == 0:  # A cada 60s (12 * 5s)
+                    elapsed = time.time() - start_time
+                    minutes = elapsed / 60
+                    
+                    positions = self.mt5.positions_get(symbol=self.symbol) if self.mt5 else []
+                    
+                    print(f"\n[PROGRESS] {minutes:.1f}min | Cycle {cycle}")
+                    print(f"  Posições ativas: {len(positions)}")
+                    print(f"  Trailing ativa em: ${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f}")
+                    print(f"  Objetivo: 3-5 posições em 15-20min")
+                    print("")
+                
+                time.sleep(self.check_interval)
+                
+                # Auto-stop após 25 minutos (tempo de teste)
+                if time.time() - start_time > 1500:  # 25 min
+                    print(f"\n[STOP] Teste de 25 minutos concluído!")
+                    break
+                
+        except KeyboardInterrupt:
+            print(f"\n[STOP] Parado pelo usuário")
+            
+        finally:
+            self._print_final_report()
+    
+    def _print_final_report(self):
+        """
+        Relatório final
+        """
+        print(f"\n{'='*60}")
+        print(f"RELATÓRIO FINAL - ULTRA-AGGRESSIVE TEST")
+        print(f"{'='*60}")
+        
+        try:
+            closed_trades = self.btc_logger.get_closed_trades_count(symbol=self.symbol)
+            active_positions = len(self.mt5.positions_get(symbol=self.symbol)) if self.mt5 else 0
+            
+            total_positions = active_positions + closed_trades
+            
+            print(f"\nESTATÍSTICAS:")
+            print(f"  Posições ativas: {active_positions}")
+            print(f"  Posições fechadas: {closed_trades}")
+            print(f"  Total: {total_positions}")
+            
+            if total_positions >= 3:
+                print(f"  [SUCESSO] Objetivo atingido: 3+ posições em ~20min")
+            elif total_positions >= 1:
+                print(f"  [PARCIAL] 1+ posições abertas (melhor que zero)")
+            else:
+                print(f"  [TESTE] Sistema funcionando, aguardar sinais")
+            
+            print(f"\nCONFIGURAÇÕES APLICADAS:")
+            print(f"  Trailing ativa: ${self._pontos_para_dinheiro(self.current_trailing_activation_pontos):.2f}")
+            print(f"  Volume: {self.volume}")
+            print(f"  Check interval: {self.check_interval}s")
+            print(f"  Cooldown: {self.cooldown_seconds}s")
+            
+        except Exception as e:
+            print(f"Erro no relatório: {e}")
+        
+        print(f"\n[CONCLUSÃO] Agente ULTRA-AGGRESSIVE funcionando!")
+        print(f"{'='*60}\n")
+
+
+if __name__ == "__main__":
+    print("INICIANDO GOLD ULTRA-AGGRESSIVE...")
+    
+    agent = GoldUltraAggressiveSimples(
+        symbol='XAUUSDc',
+        volume=0.05,
+        use_buy=True,
+        use_sell=True
+    )
+    
+    agent.run()

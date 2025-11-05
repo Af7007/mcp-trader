@@ -8,16 +8,7 @@ echo  Este script vai parar TODOS os agentes em execucao
 echo.
 echo ============================================================
 echo.
-
-set /p CONFIRM="Confirma parar TODOS os agentes? (S/N): "
-if /i not "%CONFIRM%"=="S" (
-    echo.
-    echo Operacao cancelada.
-    pause
-    exit /b 0
-)
-
-echo.
+echo Parando...
 echo Parando todos os processos Python...
 echo.
 

@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+EXECUTAR AGENTE ADAPTIVE CORRIGIDO ULTRA-AGGRESSIVE
+=================================================
+
+Comando simples para executar o agente adaptive corrigido
+com trailing ultra-sensível ($0.24 de lucro vs $1.65 anterior)
+"""
+
+import sys
+import os
+from pathlib import Path
+
+# Importar o agente corrigido
+try:
+    # Verificar se existe o arquivo principal
+    agent_file = Path("agente_adaptive_corrigido_ultra_aggressive.py")
+    if not agent_file.exists():
+        print("[❌] Arquivo do agente corrigido não encontrado!")
+        print(f"   Esperado: {agent_file}")
+        print("\n📋 PRIMEIRO, execute:")
+        print("   python validar_adaptive_corrigido.py")
+        sys.exit(1)
+    
+    # Importar o agente corrigido
+    from agente_adaptive_corrigido_ultra_aggressive import GoldAdaptiveAgentFixed, create_ultra_aggressive_agent
+    
+    print("="*70)
+    print("🚀 EXECUTANDO AGENTE ADAPTIVE CORRIGIDO ULTRA-AGGRESSIVE")
+    print("="*70)
+    print("🔧 CONFIGURAÇÕES ATIVAS:")
+    print("   • Trailing ativa com $0.24 lucro (vs $1.65 anterior)")
+    print("   • 1 confirmação de sinal (vs 2 anterior)")
+    print("   • Auto-learning DESABILITADO")
+    print("   • Verificação a cada 10s (vs 15s)")
+    print("   • Volume 0.03 lotes (vs 0.01)")
+    print("\n⏱️  RESULTADO ESPERADO:")
+    print("   • 15-30 operações/hora (vs 0-2 anterior)")
+    print("   • Trailing ativa rapidamente após abertura")
+    print("   • Logs mostram sinais sendo gerados constantemente")
+    print("\n⏹️  Para parar: Ctrl+C")
+    print("="*70)
+    
+    # Criar e executar o agente
+    agent = create_ultra_aggressive_agent()
+    
+    print("\n✅ AGENTE CRIADO COM SUCESSO!")
+    print("🔄 Iniciando monitoramento...")
+    print("-" * 50)
+    
+    # Executar o agente
+    agent.run()
+    
+except ImportError as e:
+    print(f"[❌] Erro ao importar agente: {e}")
+    print("\n📋 PRIMEIRO, execute:")
+    print("   python validar_adaptive_corrigido.py")
+    print("\n🔧 OU execute o arquivo diretamente:")
+    print("   python agente_adaptive_corrigido_ultra_aggressive.py")
+    
+except KeyboardInterrupt:
+    print("\n\n⏹️  Parando agente...")
+    print("✅ Agente parado com sucesso!")
+    
+except Exception as e:
+    print(f"\n[❌] Erro inesperado: {e}")
+    print("\n📋 AÇÕES NECESSÁRIAS:")
+    print("1. Verificar se MT5 está conectado")
+    print("2. Confirmar se símbolo XAUUSDc está disponível")
+    print("3. Executar: python validar_adaptive_corrigido.py")

@@ -12,5 +12,3 @@ echo ================================================
 echo.
 
 uv run python run_game_server.py
-
-pause

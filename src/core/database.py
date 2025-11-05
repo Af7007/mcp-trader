@@ -9,7 +9,8 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-DB_FILE = "trading_bot.db"
+# CONSOLIDADO: Usar mesmo banco que BTCLogger
+DB_FILE = "btc_trading_logs.db"
 logger = logging.getLogger(__name__)
 
 

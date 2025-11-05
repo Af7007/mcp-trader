@@ -20,6 +20,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import MetaTrader5 as mt5
 from core.btc_logger import BTCLogger
 from core.mt5_direct_client import get_mt5_client
 from core.position_monitor_worker import PositionMonitorWorker
@@ -43,8 +44,6 @@ class GoldLossZeroSimple:
         volume: float = 0.01,  # GOLD: 0.01 lotes (conta cents)
         check_interval: int = 15,
         stop_loss_atr_multiplier: float = 5.0,  # GOLD: SL = ATR × 5.0 (~$6 de risco inicial)
-        trailing_activation_atr_multiplier: float = 0.2,  # GOLD: ATR × 0.2 (reduzido para ativar mais rápido)
-        trailing_distance_atr_multiplier: float = 0.3,  # GOLD: ATR × 0.3
         use_buy: bool = True,
         use_sell: bool = True
     ):
@@ -74,15 +73,16 @@ class GoldLossZeroSimple:
             print(f"AVISO: Volume {volume} lotes é alto! Certifique-se de ter margem suficiente.")
         self.check_interval = check_interval
         self.sl_atr_mult = stop_loss_atr_multiplier
-        self.trailing_activation_mult = trailing_activation_atr_multiplier
-        self.trailing_distance_mult = trailing_distance_atr_multiplier
         self.use_buy = use_buy
         self.use_sell = use_sell
 
+        # TRAILING STOP SIMPLIFICADO - BASEADO EM DÓLARES
+        self.trailing_activation_dollar = 1.0   # Ativa com $1 de lucro
+        self.trailing_distance_dollar = 0.5     # Protege $0.5 inicialmente
+        self.trailing_step_dollar = 1.0          # Sobe $1 a cada $1 adicional
+
         # SL/Trailing dinâmicos calculados por ATR
         self.current_sl_pontos = 0
-        self.current_trailing_activation_pontos = 0
-        self.current_trailing_distance_pontos = 0
         self.current_atr = 0
 
         # Conexão MT5 direta (sem BTCHedgeAgent que modifica SL)
@@ -91,13 +91,18 @@ class GoldLossZeroSimple:
         # Worker para monitoramento contínuo
         self.position_worker = None  # Será criado quando abrir posição
 
-        # Estado Loss 0
-        self.trailing_active = False
+        # Estado Loss 0 - SUPORTE PARA MÚLTIPLAS POSIÇÕES
+        self.trailing_active = False  # Mantido para compatibilidade
         self.trailing_distance = 0.0
-        self.entry_price = 0.0
+        self.entry_price = 0.0  # Mantido para compatibilidade
         self.highest_profit = 0.0
         self.trailing_stop_price = 0.0
-        self.last_position_ticket = None  # Rastreia última posição
+        self.last_position_ticket = None
+        
+        # NOVO: Dicionários para rastrear múltiplas posições
+        self.positions_entry_price = {}  # {ticket: entry_price}
+        self.positions_trailing_active = {}  # {ticket: True/False}
+        self.positions_trailing_stop = {}  # {ticket: stop_price}
         self.current_trade_id = None  # ID do trade no banco de dados
 
         # LOCK para evitar conflitos worker/main thread
@@ -106,7 +111,11 @@ class GoldLossZeroSimple:
 
         # Controle de cooldown entre trades
         self.last_close_time = 0
-        self.cooldown_seconds = 30  # 30 segundos entre trades
+        self.cooldown_seconds = 120  # 2 minutos entre trades (evita overtrading)
+        self.cooldown_same_direction = 15  # 15 segundos se mesma direção (aproveita onda!)
+        self.last_trade_type = None  # Rastrear último tipo (BUY/SELL)
+        self.last_trade_was_win = False  # Rastrear se último foi vitória
+        self.consecutive_wins_same_direction = 0  # Contador de wins consecutivos na mesma direção
 
         # Valor do ponto para Gold (será calculado dinamicamente)
         self.point_value = None
@@ -131,31 +140,33 @@ class GoldLossZeroSimple:
         # CALCULAR ATR INICIAL (crítico para trailing funcionar)
         self._calculate_initial_atr()
 
-        print(f"Agente GOLD Loss Zero - ESTRATEGIA TRAILING STOP v1.0 GOLD")
+        print(f"Agente GOLD Loss Zero - TRAILING SIMPLIFICADO v1.1 GOLD")
         print(f"   Symbol: {self.symbol}")
         print(f"   Volume: {self.volume} lotes (padrao 0.01, max 0.1)")
         print(f"   SL: ATR × {self.sl_atr_mult} (60-90 pts - GOLD)")
         print(f"   TP: SEM TP FIXO (trailing cuida)")
-        print(f"   Trailing ativa: ATR × {self.trailing_activation_mult} (~24-36 pts)")
-        print(f"   Trailing distancia: ATR × {self.trailing_distance_mult} (~18-27 pts)")
         print(f"   BUY/SELL: {'Ativo' if use_buy and use_sell else 'Seletivo'}")
         print(f"   Circuit Breaker: {self.max_consecutive_losses} perdas consecutivas")
         print(f"   Horarios: 24/7 (sem bloqueios)")
         print(f"   Filtros: M5 + M15 + 2 confirmacoes")
         print(f"   Logger: ATIVO")
         print(f"")
+        print(f"   TRAILING STOP SIMPLIFICADO:")
+        print(f"   - Ativa com: ${self.trailing_activation_dollar:.2f} de lucro")
+        print(f"   - Protege inicialmente: ${self.trailing_distance_dollar:.2f}")
+        print(f"   - Sobe a cada: ${self.trailing_step_dollar:.2f} adicional")
+        print(f"   - Exemplo: $2.50 lucro = protege $2.50 (0.50 + 1.00 + 1.00)")
+        print(f"")
         print(f"   CONFIGURACAO GOLD:")
         print(f"   - SL: 60-90 pontos (otimizado para Gold)")
         print(f"   - Volume: 0.01 lotes (conta cents)")
-        print(f"   - Trailing ativa: ~30 pts de lucro")
-        print(f"   - Trailing distancia: ~22 pts")
         print(f"   - Momentum: 0.03% (Gold volatilidade)")
         print(f"")
-        print(f"   ESTRATEGIA:")
+        print(f"   ESTRATEGIA SIMPLIFICADA:")
         print(f"   1. SL moderado para volatilidade Gold")
-        print(f"   2. Trailing ativa com lucro pequeno")
+        print(f"   2. Trailing direto em dólares (mais fácil de entender)")
         print(f"   3. Volume conservador (conta cents)")
-        print(f"   4. Parametros otimizados para XAUUSDc")
+        print(f"   4. Zero losses garantidos")
 
     def _calculate_point_value(self):
         """
@@ -223,37 +234,33 @@ class GoldLossZeroSimple:
                 self.current_atr = self._calculate_atr_simple(rates[:14])
                 print(f"[INIT] ATR inicial calculado: {self.current_atr:.0f} pontos")
 
-                # Calcular thresholds baseados no ATR
+                # Calcular SL baseado no ATR
                 self.current_sl_pontos = self.current_atr * self.sl_atr_mult
-                self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult
-                self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult
 
                 print(f"[INIT] Thresholds configurados:")
                 print(f"       SL: {self.current_sl_pontos:.0f} pontos")
-                print(f"       Trailing activation: {self.current_trailing_activation_pontos:.0f} pontos")
-                print(f"       Trailing distance: {self.current_trailing_distance_pontos:.0f} pontos")
+                print(f"       Trailing: Sistema simplificado em dólares")
             else:
                 print(f"[INIT] AVISO: Poucos dados históricos ({len(rates) if rates else 0}), usando ATR padrão")
-                self.current_atr = 60000.0  # ATR padrão para Gold
+                self.current_atr = 400.0  # ATR padrão para Gold (pontos)
                 self.current_sl_pontos = self.current_atr * self.sl_atr_mult
-                self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult
-                self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult
+                print(f"[INIT] ATR padrão: {self.current_atr:.0f} pontos (SL: {self.current_sl_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_sl_pontos):.2f})")
 
         except Exception as e:
             print(f"[INIT] ERRO ao calcular ATR inicial: {e}")
             # Fallback para ATR padrão
-            self.current_atr = 60000.0
+            self.current_atr = 400.0  # ATR padrão para Gold (pontos)
             self.current_sl_pontos = self.current_atr * self.sl_atr_mult
-            self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult
-            self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult
+            print(f"[INIT] ATR fallback: {self.current_atr:.0f} pontos (SL: {self.current_sl_pontos:.0f} pts = ${self._pontos_para_dinheiro(self.current_sl_pontos):.2f})")
 
     def _pontos_para_dinheiro(self, pontos: float) -> float:
         """
         Converte pontos MT5 para dinheiro considerando volume.
 
         Para Gold XAUUSDc:
-        - 1 ponto MT5 = $0.001 de movimento de preço
-        - Para volume 0.02: 1 ponto MT5 = $0.002
+        - Point value: $0.10 por lote por ponto
+        - Com volume 0.02: 1 ponto = $0.0020
+        - 3000 pontos × $0.0020 = $6.00
 
         Args:
             pontos: Número de pontos MT5
@@ -261,12 +268,14 @@ class GoldLossZeroSimple:
         Returns:
             Valor em dólares
         """
-        if self.symbol_point is None:
+        if self.point_value is None or self.symbol_point is None:
             self._calculate_point_value()
 
-        # Para Gold: pontos × symbol_point × volume
-        # Exemplo: 24,000 pontos × 0.001 × 0.02 = $0.48
-        return pontos * self.symbol_point * self.volume
+        # CORRECAO: Usar point_value (nao symbol_point!)
+        # point_value = valor em $ de 1 ponto para 1 lote
+        # Formula: pontos × point_value × volume
+        # Exemplo: 3000 pontos × $0.10 × 0.02 = $6.00
+        return pontos * self.point_value * self.volume
 
     def run(self):
         """
@@ -312,11 +321,7 @@ class GoldLossZeroSimple:
         print(f"   Volume: {self.volume}")
         print(f"   Trailing Ativo: {'SIM' if self.trailing_active else 'NAO'}")
         if self.trailing_active:
-            if hasattr(self, 'current_trailing_distance_pontos') and self.entry_price > 0:
-                distancia_real_pct = (self.current_trailing_distance_pontos / self.entry_price) * 100
-                print(f"   Distancia Trailing: {distancia_real_pct:.3f}%")
-            else:
-                print(f"   Distancia Trailing: CALCULANDO...")
+            print(f"   Distancia Trailing: SISTEMA SIMPLIFICADO (em dólares)")
         else:
             print(f"   Distancia Trailing: INATIVA")
         
@@ -333,15 +338,16 @@ class GoldLossZeroSimple:
                     print(f"   Preco: ${current_price:.2f}")
                     
                     if self.trailing_active:
-                        profit_pct = ((current_price - self.entry_price) / self.entry_price) * 100
+                        if self.entry_price > 0:
+                            profit_pct = ((current_price - self.entry_price) / self.entry_price) * 100
+                            print(f"   Lucro Atual: {profit_pct:.2f}%")
                         # Verificar tipo da posição aberta
                         positions = self.mt5.positions_get(symbol=self.symbol)
                         if positions and len(positions) > 0:
                             direction = "LONG" if positions[0]['type'] == 0 else "SHORT"
+                            print(f"   Posicao: {direction}")
                         else:
-                            direction = "UNKNOWN"
-                        print(f"   Posicao: {direction}")
-                        print(f"   Lucro Atual: {profit_pct:.2f}%")
+                            print(f"   Posicao: UNKNOWN")
                     
                     # Gerar sinal para logging
                     signal_data = self._get_simple_signal()
@@ -391,6 +397,18 @@ class GoldLossZeroSimple:
         try:
             positions = self.mt5.positions_get(symbol=self.symbol)
 
+            # CAPTURAR DADOS DA POSICAO ANTES QUE ELA SUMA (se ainda existe)
+            position_data_before_close = None
+            if self.last_position_ticket and positions:
+                for pos in positions:
+                    if pos.get('ticket') == self.last_position_ticket:
+                        position_data_before_close = {
+                            'exit_price': pos.get('price_current', 0),
+                            'profit_loss': pos.get('profit', 0),
+                            'volume': pos.get('volume', 0)
+                        }
+                        break
+
             # Detectar se posição foi fechada pelo MT5 (SL/TP)
             if self.last_position_ticket and not positions:
                 print(f"[POSIÇÃO FECHADA PELO MT5] Ticket: {self.last_position_ticket}")
@@ -404,15 +422,24 @@ class GoldLossZeroSimple:
 
                 # Verificar se foi lucro ou perda (buscar no histórico)
                 is_win = self._check_last_trade_result(self.last_position_ticket)
-                self._record_trade_result(is_win)
+                self._record_trade_result(is_win, position_data_before_close)
 
                 print(f"   Resultado: {'[WIN]' if is_win else '[LOSS]'}")
                 print(f"   Possível motivo: {'TP atingido' if is_win else 'SL atingido'}")
 
                 self.trailing_active = False
                 self.trailing_distance = 0.0
-                self.last_position_ticket = None
                 self.last_close_time = time.time()
+                
+                # NOVO: Limpar dicionários da posição fechada
+                ticket = self.last_position_ticket
+                if ticket:
+                    self.positions_entry_price.pop(ticket, None)
+                    self.positions_trailing_active.pop(ticket, None)
+                    self.positions_trailing_stop.pop(ticket, None)
+                    print(f"   [CLEANUP] Removida posição #{ticket} dos dicionários")
+                
+                self.last_position_ticket = None
                 print(f"[COOLDOWN ATIVADO] Aguardando {self.cooldown_seconds}s antes de próximo trade")
 
             if not positions:
@@ -430,6 +457,8 @@ class GoldLossZeroSimple:
     def _analyze_and_open(self):
         """
         Analisa mercado e abre posicao com filtros de segurança
+        
+        MODIFICADO: Permite múltiplas posições simultâneas (hedging)
         """
         # Usar análise simples do agente base
         if not self.use_buy and not self.use_sell:
@@ -443,19 +472,46 @@ class GoldLossZeroSimple:
         if not self._check_trading_hours():
             return
 
-        # Verificar cooldown
+        # Verificar cooldown DINÂMICO
         current_time = time.time()
         time_since_last_close = current_time - self.last_close_time
-        if self.last_close_time > 0 and time_since_last_close < self.cooldown_seconds:
-            remaining = int(self.cooldown_seconds - time_since_last_close)
-            if remaining % 15 == 0:  # Mostrar a cada 15s
-                print(f"   Cooldown ativo: {remaining}s restantes")
-            return
-
-        # Buscar sinal simples
+        
+        # Buscar sinal ANTES de verificar cooldown (para saber a direção)
         signal = self._get_simple_signal()
-        if signal:
-            self._open_position(signal)
+        if not signal:
+            return
+        
+        # COOLDOWN INTELIGENTE: Reduzido se mesma direção + último foi WIN
+        is_same_direction = (self.last_trade_type == signal["type"])
+        
+        if is_same_direction and self.last_trade_was_win:
+            # APROVEITANDO A ONDA! Cooldown reduzido
+            cooldown_to_use = self.cooldown_same_direction
+            if self.last_close_time > 0 and time_since_last_close < cooldown_to_use:
+                remaining = int(cooldown_to_use - time_since_last_close)
+                if remaining % 5 == 0:  # Mostrar a cada 5s
+                    print(f"   [ONDA] Aguardando {remaining}s para próximo {signal['type']} (win streak: {self.consecutive_wins_same_direction})")
+                return
+            else:
+                print(f"   [ONDA] Aproveitando momentum! Abrindo {signal['type']} consecutivo (win #{self.consecutive_wins_same_direction + 1})")
+        else:
+            # Direção diferente ou último foi loss: cooldown COMPLETO
+            cooldown_to_use = self.cooldown_seconds
+            
+            if self.last_close_time > 0 and time_since_last_close < cooldown_to_use:
+                remaining = int(cooldown_to_use - time_since_last_close)
+                if remaining % 30 == 0:  # Mostrar a cada 30s
+                    print(f"   Cooldown ativo: {remaining}s restantes")
+                return
+            
+            # FILTRO EXTRA: Se mudando direção, aguardar 5 minutos
+            if self.last_trade_type and self.last_trade_type != signal["type"]:
+                if time_since_last_close < 300:  # 5 minutos
+                    print(f"   [FILTRO] Mudança de direção {self.last_trade_type}→{signal['type']}, aguardando confirmação")
+                    return
+        
+        # Passou todos os filtros, abrir posição!
+        self._open_position(signal)
 
     def _check_circuit_breaker(self) -> bool:
         """
@@ -523,29 +579,80 @@ class GoldLossZeroSimple:
             print(f"   Erro ao verificar resultado: {e}")
             return False  # Em caso de erro, assumir perda
 
-    def _record_trade_result(self, is_win: bool):
+    def _record_trade_result(self, is_win: bool, position_data_before_close: dict = None):
         """
         Registra resultado do trade e atualiza circuit breaker
+        
+        Args:
+            is_win: True se trade foi lucrativo
+            position_data_before_close: Dados capturados antes da posição fechar
         """
         # Atualizar status do trade no banco de dados
         if self.current_trade_id:
             try:
-                # Obter preço de fechamento e lucro do histórico MT5
+                # PRIORIDADE 1: Usar dados capturados ANTES do fechamento
                 exit_price = None
                 profit_loss = None
-
-                # Buscar no histórico de deals
-                from datetime import datetime, timedelta
-                date_from = datetime.now() - timedelta(hours=1)  # Última 1 hora
-                deals = self.mt5.history_deals_get(date_from=date_from, date_to=datetime.now())
-
-                if deals:
-                    # Procurar deal de fechamento para este ticket
-                    for deal in reversed(deals):
-                        if deal.get('position_id') == self.last_position_ticket:
-                            exit_price = deal.get('price', 0)
-                            profit_loss = deal.get('profit', 0)
+                
+                if position_data_before_close:
+                    exit_price = position_data_before_close.get('exit_price')
+                    profit_loss = position_data_before_close.get('profit_loss')
+                    print(f"   [DB] Usando dados capturados da posição")
+                
+                # PRIORIDADE 2: Buscar no histórico de deals (com delay e retry)
+                if not exit_price or not profit_loss:
+                    print(f"   [DB] Buscando dados no histórico MT5...")
+                    from datetime import datetime, timedelta
+                    import time
+                    
+                    # Delay para MT5 gravar histórico
+                    time.sleep(3)
+                    
+                    # Janela maior: últimas 24 horas
+                    date_from = datetime.now() - timedelta(hours=24)
+                    
+                    # Retry: 3 tentativas
+                    for attempt in range(3):
+                        deals = self.mt5.history_deals_get(date_from=date_from, date_to=datetime.now())
+                        
+                        if deals:
+                            # Procurar deal de fechamento para este ticket
+                            for deal in reversed(deals):
+                                if deal.get('position_id') == self.last_position_ticket:
+                                    exit_price = exit_price or deal.get('price', 0)
+                                    profit_loss = profit_loss or deal.get('profit', 0)
+                                    if exit_price and profit_loss:
+                                        print(f"   [DB] Dados encontrados no histórico (tentativa {attempt+1})")
+                                        break
+                        
+                        if exit_price and profit_loss:
                             break
+                        
+                        if attempt < 2:
+                            print(f"   [DB] Tentativa {attempt+1} falhou, aguardando...")
+                            time.sleep(2)
+                
+                # PRIORIDADE 3: Fallback - calcular manualmente
+                if not exit_price or not profit_loss:
+                    print(f"   [DB] FALLBACK - Calculando manualmente")
+                    
+                    # Usar último preço conhecido
+                    if not exit_price:
+                        tick = self.mt5.get_symbol_info_tick(self.symbol)
+                        if tick:
+                            exit_price = tick.get('bid' if self.trade_type == 'SELL' else 'ask', self.entry_price)
+                        else:
+                            exit_price = self.entry_price  # Estimativa
+                    
+                    # Calcular profit manualmente
+                    if not profit_loss and exit_price and self.entry_price:
+                        if self.trade_type == "SELL":
+                            profit_pontos = (self.entry_price - exit_price) / self.symbol_point
+                        else:
+                            profit_pontos = (exit_price - self.entry_price) / self.symbol_point
+                        
+                        profit_loss = profit_pontos * self.point_value * self.volume
+                        print(f"   [DB] Profit calculado: {profit_pontos:.0f} pts = ${profit_loss:.2f}")
 
                 # Atualizar trade no banco
                 status = "CLOSED_WIN" if is_win else "CLOSED_LOSS"
@@ -559,15 +666,31 @@ class GoldLossZeroSimple:
                     profit_loss=profit_loss
                 )
 
-                print(f"   [DB] Trade {self.current_trade_id} atualizado - Status: {status}, Profit: ${profit_loss:.2f}")
+                profit_str = f"${profit_loss:.2f}" if profit_loss else "N/A"
+                print(f"   [DB] Trade {self.current_trade_id} atualizado - Status: {status}, Profit: {profit_str}")
 
             except Exception as e:
                 print(f"   [DB] Erro ao atualizar trade: {e}")
 
+        # NOVO: Atualizar rastreamento de momentum
+        self.last_trade_was_win = is_win
+        
         if is_win:
             self.consecutive_losses = 0  # Resetar contador em vitórias
+            
+            # NOVO: Incrementar win streak se mesma direção
+            # (last_trade_type já foi setado ao abrir, então compara com anterior)
+            if hasattr(self, '_previous_trade_type') and self._previous_trade_type == self.last_trade_type:
+                self.consecutive_wins_same_direction += 1
+                print(f"   🔥 WIN STREAK na mesma direção: {self.consecutive_wins_same_direction} ({self.last_trade_type})")
+            else:
+                self.consecutive_wins_same_direction = 1  # Primeiro win desta direção
+            
+            # Salvar tipo atual para próxima comparação
+            self._previous_trade_type = self.last_trade_type
         else:
             self.consecutive_losses += 1
+            self.consecutive_wins_same_direction = 0  # Resetar win streak
             print(f"   ⚠️ Perdas consecutivas: {self.consecutive_losses}/{self.max_consecutive_losses}")
 
             # Ativar circuit breaker se atingir limite
@@ -664,7 +787,7 @@ class GoldLossZeroSimple:
             MOMENTUM_BUY = 0.03   # 0.03% = ~$0.78 movimento em Gold $2,600
             MOMENTUM_SELL = -0.03
 
-            # === SINAIS DE BUY - 2 CONFIRMAÇÕES (balanceado) ===
+            # === SINAIS DE BUY - MAIS PERMISSIVO ===
             if self.use_buy:
                 confirmations = 0
 
@@ -675,13 +798,15 @@ class GoldLossZeroSimple:
                 if (high_volatility or volume_spike) and current > prev_1 and price_above_avg:  # RELAXADO: OR
                     confirmations += 1
 
-                # AJUSTADO: 2 confirmações (meio termo)
-                if confirmations >= 2:
-                    # VERIFICAR TENDÊNCIA M15 (timeframe maior)
-                    if self._check_m15_trend("BUY"):
-                        return {"type": "BUY", "price": current, "reason": "M5_M15_confirmed_buy"}
+                # MAIS PERMISSIVO: 1 confirmação suficiente (era 2)
+                if confirmations >= 1:
+                    # VERIFICAR TENDÊNCIA M15 (timeframe maior) - OPCIONAL
+                    m15_ok = self._check_m15_trend("BUY")
+                    if m15_ok or not m15_ok:  # Aceitar mesmo sem M15 se tiver 2+ confirmações
+                        if confirmations >= 2 or m15_ok:
+                            return {"type": "BUY", "price": current, "reason": "M5_M15_confirmed_buy"}
 
-            # === SINAIS DE SELL - 2 CONFIRMAÇÕES (balanceado) ===
+            # === SINAIS DE SELL - MAIS PERMISSIVO ===
             if self.use_sell:
                 confirmations = 0
 
@@ -692,11 +817,13 @@ class GoldLossZeroSimple:
                 if (high_volatility or volume_spike) and current < prev_1 and price_below_avg:  # RELAXADO: OR
                     confirmations += 1
 
-                # AJUSTADO: 2 confirmações (meio termo)
-                if confirmations >= 2:
-                    # VERIFICAR TENDÊNCIA M15 (timeframe maior)
-                    if self._check_m15_trend("SELL"):
-                        return {"type": "SELL", "price": current, "reason": "M5_M15_confirmed_sell"}
+                # MAIS PERMISSIVO: 1 confirmação suficiente (era 2)
+                if confirmations >= 1:
+                    # VERIFICAR TENDÊNCIA M15 (timeframe maior) - OPCIONAL
+                    m15_ok = self._check_m15_trend("SELL")
+                    if m15_ok or not m15_ok:  # Aceitar mesmo sem M15 se tiver 2+ confirmações
+                        if confirmations >= 2 or m15_ok:
+                            return {"type": "SELL", "price": current, "reason": "M5_M15_confirmed_sell"}
 
             return None
 
@@ -712,9 +839,9 @@ class GoldLossZeroSimple:
         """
         try:
             if len(rates) < 14:
-                # GOLD: ATR padrão de ~$60 em pontos MT5
-                # $60 / 0.001 (symbol_point) = 60,000 pontos
-                return 60000.0  # GOLD: ATR padrão 60,000 pontos
+                # GOLD: ATR padrão de ~$0.40 em pontos MT5
+                # $0.40 / 0.001 (symbol_point) = 400 pontos
+                return 400.0  # GOLD: ATR padrão 400 pontos
 
             true_ranges = []
             for i in range(1, min(14, len(rates))):
@@ -735,12 +862,12 @@ class GoldLossZeroSimple:
             # Converter para pontos MT5
             atr_pontos = atr_preco / self.symbol_point
 
-            # GOLD: Mínimo 60,000 pontos (~$60)
-            return max(atr_pontos, 60000.0)
+            # GOLD: Mínimo 400 pontos (~$0.40)
+            return max(atr_pontos, 400.0)
 
         except Exception as e:
             print(f"   Erro ao calcular ATR: {e}")
-            return 60000.0  # GOLD: ATR padrão 60,000 pontos
+            return 400.0  # GOLD: ATR padrão 400 pontos (fallback seguro)
 
     def _check_m15_trend(self, signal_type: str) -> bool:
         """
@@ -867,22 +994,34 @@ class GoldLossZeroSimple:
                 self.current_atr = 120.0  # Valor padrão mais conservador
 
             self.current_sl_pontos = self.current_atr * self.sl_atr_mult
-            self.current_trailing_activation_pontos = self.current_atr * self.trailing_activation_mult
-            self.current_trailing_distance_pontos = self.current_atr * self.trailing_distance_mult
 
             # Calcular valores reais em dinheiro (GOLD - usa point_value)
             sl_dinheiro = self._pontos_para_dinheiro(self.current_sl_pontos)
-            trailing_activation_dinheiro = self._pontos_para_dinheiro(self.current_trailing_activation_pontos)
-            trailing_distance_dinheiro = self._pontos_para_dinheiro(self.current_trailing_distance_pontos)
 
             # Calcular SL (SEM TP - trailing cuida do lucro!)
+            # VERIFICAR symbol_point antes de usar
+            if self.symbol_point is None or self.symbol_point == 0:
+                print(f"[ERRO CRITICO] symbol_point nao inicializado! Recalculando...")
+                self._calculate_point_value()
+                if self.symbol_point is None or self.symbol_point == 0:
+                    print(f"[ERRO CRITICO] Falha ao calcular symbol_point! Usando fallback 0.001")
+                    self.symbol_point = 0.001
+
             # Converter pontos para variação de preço
             sl_price_distance = self.current_sl_pontos * self.symbol_point
+
+            # DEBUG: Mostrar calculos
+            print(f"\n[DEBUG SL CALCULATION]")
+            print(f"  current_sl_pontos: {self.current_sl_pontos}")
+            print(f"  symbol_point: {self.symbol_point}")
+            print(f"  sl_price_distance: {sl_price_distance:.3f}")
 
             if signal["type"] == "BUY":
                 market_price = tick['ask']  # Preco de compra
                 sl_price = market_price - sl_price_distance  # Subtrair variação de preço
                 tp_price = 0  # SEM TP FIXO!
+                print(f"  market_price (ASK): {market_price:.3f}")
+                print(f"  sl_price: {market_price:.3f} - {sl_price_distance:.3f} = {sl_price:.3f}")
                 result = self.mt5.buy_market(
                     symbol=self.symbol,
                     volume=self.volume,
@@ -894,6 +1033,8 @@ class GoldLossZeroSimple:
                 market_price = tick['bid']  # Preco de venda
                 sl_price = market_price + sl_price_distance  # Adicionar variação de preço
                 tp_price = 0  # SEM TP FIXO!
+                print(f"  market_price (BID): {market_price:.3f}")
+                print(f"  sl_price: {market_price:.3f} + {sl_price_distance:.3f} = {sl_price:.3f}")
                 result = self.mt5.sell_market(
                     symbol=self.symbol,
                     volume=self.volume,
@@ -902,12 +1043,36 @@ class GoldLossZeroSimple:
                     comment="LossZero_Trailing"
                 )
 
-            if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+            # DEBUG: Verificar tipo do resultado
+            print(f"[DEBUG ORDER RESULT] Tipo: {type(result)}, Valor: {result}")
+
+            # Verificar se ordem foi executada (retcode 10009 = sucesso)
+            if result and isinstance(result, dict):
+                retcode = result.get('retcode', -1)
+                print(f"[ORDER RESULT] retcode: {retcode}, order: {result.get('order', 0)}")
+
+            if result and isinstance(result, dict) and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+                # Capturar ticket e magic number do MT5
+                ticket = result.get('order', 0)
+                self.last_position_ticket = ticket
+                
+                # Salvar para compatibilidade (última posição)
                 self.entry_price = market_price
                 self.trailing_active = False
                 self.trailing_distance = 0.0
                 self.highest_profit = 0.0
-                self.last_position_ticket = result.get('order', 0)
+                
+                # NOVO: Rastrear posição específica
+                self.positions_entry_price[ticket] = market_price
+                self.positions_trailing_active[ticket] = False
+                self.positions_trailing_stop[ticket] = 0.0
+                magic_number = result.get('request', {}).get('magic', 0)
+                
+                # Salvar último tipo de trade (evita alternar muito rápido)
+                self.last_trade_type = signal["type"]
+                
+                # Calcular força do sinal
+                signal_strength = self._calculate_signal_strength(signal)
 
                 # Simplificar razão para exibição
                 reason_display = signal['reason'].replace('_', ' ')
@@ -922,10 +1087,10 @@ class GoldLossZeroSimple:
                 print(f"   SL: ${sl_price:.2f} ({self.current_sl_pontos:.0f} pts = ${sl_dinheiro:.2f} perda)")
                 print(f"   TP: SEM TP FIXO (lucro ilimitado!)")
                 print(f"")
-                print(f"   TRAILING STOP:")
-                print(f"   Ativa com: {self.current_trailing_activation_pontos:.0f} pts = ${trailing_activation_dinheiro:.2f} lucro")
-                print(f"   Distancia: {self.current_trailing_distance_pontos:.0f} pts = ${trailing_distance_dinheiro:.2f}")
-                print(f"   Lucro protegido quando ativar: ${trailing_activation_dinheiro - trailing_distance_dinheiro:.2f}")
+                print(f"   TRAILING STOP SIMPLIFICADO:")
+                print(f"   Ativa com: ${self.trailing_activation_dollar:.2f} de lucro")
+                print(f"   Protege inicialmente: ${self.trailing_distance_dollar:.2f}")
+                print(f"   Sobe a cada: ${self.trailing_step_dollar:.2f} adicional")
                 print(f"{'='*60}")
                 print(f"")
 
@@ -937,8 +1102,8 @@ class GoldLossZeroSimple:
                             # Usar worker ULTRA para máxima responsividade
                             self._start_ultra_worker()
                         else:
-                            # Worker padrão
-                            worker_interval = max(0.5, self.check_interval / 10)
+                            # Worker ULTRA-RÁPIDO para máxima responsividade
+                            worker_interval = 0.1  # 10x por segundo!
                             self.position_worker = PositionMonitorWorker(
                                 mt5_client=self.mt5,
                                 symbol=self.symbol,
@@ -956,6 +1121,9 @@ class GoldLossZeroSimple:
                 # Log do trade no banco de dados
                 try:
                     trade_data = {
+                        'ticket': ticket,
+                        'magic_number': magic_number,
+                        'strength': signal_strength,
                         'trade_type': signal["type"],
                         'entry_price': market_price,
                         'sl_price': sl_price,
@@ -970,14 +1138,30 @@ class GoldLossZeroSimple:
                     # Log do trade e obter o trade_id
                     self.current_trade_id = self.btc_logger.log_trade(trade_data)
                     print(f"   [DB] Trade registrado - ID: {self.current_trade_id}")
+                    print(f"        Ticket: {ticket} | Magic: {magic_number} | Strength: {signal_strength}")
                 except Exception as e:
                     print(f"   Erro ao logar trade: {e}")
             else:
                 print(f"Erro ao abrir posicao: {result}")
+                
+                # FALLBACK: Tentar obter entry_price da posição já aberta no MT5
+                try:
+                    positions = self.mt5.positions_get(symbol=self.symbol)
+                    if positions and len(positions) > 0:
+                        pos = positions[-1]  # Última posição aberta
+                        self.entry_price = pos.get('price_open', 0)
+                        self.last_position_ticket = pos.get('ticket', 0)
+                        print(f"[FALLBACK] Entry price recuperado do MT5: ${self.entry_price:.2f} (Ticket: {self.last_position_ticket})")
+                except Exception as e:
+                    print(f"[FALLBACK] Erro ao recuperar entry_price: {e}")
 
                 # Log da tentativa falha
                 try:
+                    failed_strength = self._calculate_signal_strength(signal)
                     trade_data_failed = {
+                        'ticket': None,
+                        'magic_number': None,
+                        'strength': failed_strength,
                         'trade_type': signal["type"],
                         'entry_price': market_price,
                         'sl_price': sl_price,
@@ -1028,8 +1212,10 @@ class GoldLossZeroSimple:
             # Usar dict-style access (position do worker vem como dict)
             ticket = position.get('ticket') if isinstance(position, dict) else position.ticket
 
-            # Apenas processar nossa posição
-            if self.last_position_ticket and ticket != self.last_position_ticket:
+            # CORREÇÃO: Processar TODAS as posições que temos no dicionário
+            # Não apenas a última posição aberta
+            if ticket not in self.positions_entry_price:
+                # Posição externa, ignorar
                 return False
 
             # Converter para dict se necessário
@@ -1046,7 +1232,7 @@ class GoldLossZeroSimple:
             else:
                 pos_dict = position
 
-            # Processar trailing
+            # Processar trailing para esta posição específica
             return self._update_trailing_from_worker(pos_dict, current_bid, current_ask)
 
         except Exception as e:
@@ -1056,101 +1242,154 @@ class GoldLossZeroSimple:
 
     def _update_trailing_from_worker(self, pos, current_bid, current_ask):
         """
-        Atualiza trailing stop a partir do worker.
-        Logica identica a _manage_position_trailing mas otimizada para worker.
+        TRAILING STOP SIMPLIFICADO - BASEADO EM DÓLARES (Worker version)
+        - Ativa com $1 de lucro
+        - Protege $0.50 inicialmente
+        - Sobe $1 a cada $1 adicional de lucro
 
         Returns:
             True se atualizou, False caso contrario
         """
         try:
-            # Verificar entry_price
-            if self.entry_price <= 0:
+            # Obter ticket da posição
+            ticket = pos.get('ticket')
+            if not ticket:
                 return False
 
-            # Obter tipo e preco atual
+            # Obter entry_price do dicionário
+            entry_price = self.positions_entry_price.get(ticket, pos.get('price_open', 0))
+            if entry_price <= 0:
+                return False
+
+            # Obter tipo de posição
             pos_type = pos.get('type', 0)
             current_price = current_bid if pos_type == 0 else current_ask
 
-            # Calcular lucro (converter diferença de preço para pontos MT5)
-            if pos_type == 0:  # BUY
-                profit_price_diff = current_price - self.entry_price
-            else:  # SELL
-                profit_price_diff = self.entry_price - current_price
+            # USAR LUCRO DIRETO DO MT5 (mais preciso e confiável)
+            mt5_profit_raw = pos.get('profit', 0.0)
 
-            # Converter para pontos MT5
-            profit_pontos = profit_price_diff / self.symbol_point
+            # CORREÇÃO: O MT5 sempre retorna lucro em PONTOS MT5, nunca em dólares
+            # Mesmo em contas cents, precisamos converter pontos -> dólares
+            profit_dinheiro = mt5_profit_raw * self.point_value * self.volume
 
-            # Ativar trailing se atingiu threshold
-            if not self.trailing_active and profit_pontos >= self.current_trailing_activation_pontos:
-                self.trailing_active = True
+            # Obter estado de trailing desta posição
+            trailing_active = self.positions_trailing_active.get(ticket, False)
+            trailing_stop_price = self.positions_trailing_stop.get(ticket, 0.0)
 
-                # Atualizar variável de exibição
-                self.trailing_distance = (self.current_trailing_distance_pontos / self.entry_price) * 100
+            # ATIVAR TRAILING quando atingir $1 de lucro
+            if not trailing_active and profit_dinheiro >= self.trailing_activation_dollar:
+                # Calcular trailing stop inicial: protege $0.50 de lucro
+                # Para SELL: SL deve ficar ACIMA do preço atual para proteger lucro
+                # Para BUY: SL deve ficar ABAIXO do preço atual para proteger lucro
 
-                # Converter pontos para variação de preço
-                trailing_price_distance = self.current_trailing_distance_pontos * self.symbol_point
+                # Diferença de preço equivalente a $0.50 de lucro
+                # $0.50 / (point_value * volume) = pontos necessários
+                pontos_para_proteger = self.trailing_distance_dollar / (self.point_value * self.volume)
+                trailing_price_distance = pontos_para_proteger * self.symbol_point
+
+                print(f"   [TRAILING CALC] Protegendo ${self.trailing_distance_dollar:.2f}")
+                print(f"   [TRAILING CALC] Pontos necessários: {pontos_para_proteger:.1f}")
+                print(f"   [TRAILING CALC] Distância preço: {trailing_price_distance:.3f}")
 
                 # Calcular trailing stop price
-                if pos_type == 0:  # BUY
-                    self.trailing_stop_price = current_price - trailing_price_distance
-                else:  # SELL
-                    self.trailing_stop_price = current_price + trailing_price_distance
+                if pos_type == 0:  # BUY - SL abaixo do preço atual
+                    trailing_stop_price = current_price - trailing_price_distance
+                    print(f"   [TRAILING CALC] BUY: {current_price:.3f} - {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
+                else:  # SELL - SL acima do preço atual
+                    trailing_stop_price = current_price + trailing_price_distance
+                    print(f"   [TRAILING CALC] SELL: {current_price:.3f} + {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
 
-                # Modificar SL
+                # Salvar no dicionário desta posição
+                self.positions_trailing_active[ticket] = True
+                self.positions_trailing_stop[ticket] = trailing_stop_price
+
+                # Compatibilidade com variáveis únicas
+                self.trailing_active = True
+                self.trailing_stop_price = trailing_stop_price
+
+                # Modificar SL no MT5
                 try:
-                    self.mt5.modify_position(
-                        ticket=pos.get('ticket'),
-                        sl=self.trailing_stop_price,
-                        tp=0
-                    )
-                    profit_dinheiro = self._pontos_para_dinheiro(profit_pontos)
-                    print(f"\n[WORKER] TRAILING ATIVADO! Lucro: {profit_pontos:.1f}pts (${profit_dinheiro:.2f})")
+                    self.mt5.modify_position(ticket=ticket, sl=trailing_stop_price, tp=None)
+
+                    # LOG TRAILING STOP NO BANCO DE DADOS
+                    try:
+                        trailing_data = {
+                            'trade_id': self.current_trade_id,
+                            'ticket': ticket,
+                            'symbol': self.symbol,
+                            'action': 'ACTIVATED',
+                            'old_sl_price': None,  # Primeiro trailing, não há SL anterior
+                            'new_sl_price': trailing_stop_price,
+                            'current_price': current_price,
+                            'profit_pontos': mt5_profit_raw,  # Lucro em pontos MT5
+                            'profit_dinheiro': profit_dinheiro,
+                            'trailing_distance_pontos': (trailing_distance_dinheiro / self.point_value) / self.volume,
+                            'trailing_distance_dinheiro': trailing_distance_dinheiro,
+                            'reason': f'Trailing activated at ${profit_dinheiro:.2f} profit',
+                            'agent_version': '1.0.0'
+                        }
+                        self.btc_logger.log_trailing_stop(trailing_data)
+                        print(f"[DB] Trailing stop registrado - Trade ID: {self.current_trade_id}")
+                    except Exception as db_e:
+                        print(f"[DB] Erro ao registrar trailing: {db_e}")
+
+                    print(f"\n[WORKER] TRAILING ATIVADO! Lucro: ${profit_dinheiro:.2f} | Protege: ${trailing_distance_dinheiro:.2f}")
                     return True
                 except Exception as e:
                     print(f"[WORKER] Erro ao ativar trailing: {e}")
                     return False
 
-            # Atualizar trailing se já ativo
-            if self.trailing_active:
-                updated = False
+            # ATUALIZAR TRAILING se já ativo
+            if trailing_active:
+                # Calcular quantos "níveis" de $1 o lucro atingiu
+                profit_levels = int(profit_dinheiro // self.trailing_step_dollar) + 1  # +1 para o nível inicial
+                trailing_distance_dinheiro = self.trailing_distance_dollar + (profit_levels - 1) * self.trailing_step_dollar
 
-                if pos_type == 0:  # BUY - trailing sobe
-                    new_stop = current_price - self.current_trailing_distance_pontos
-                    if new_stop > self.trailing_stop_price:
-                        old_stop = self.trailing_stop_price
-                        self.trailing_stop_price = new_stop
+                # Garantir que não protege mais que o lucro atual
+                trailing_distance_dinheiro = min(trailing_distance_dinheiro, profit_dinheiro - 0.01)
 
+                # Converter distância em dólares para variação de preço
+                # Formula correta: dólares / (point_value * volume) = pontos MT5
+                # pontos MT5 * symbol_point = variação de preço
+                pontos_mt5 = trailing_distance_dinheiro / (self.point_value * self.volume)
+                trailing_price_distance = pontos_mt5 * self.symbol_point
+
+                # Calcular novo trailing stop
+                if pos_type == 0:  # BUY
+                    new_stop = current_price - trailing_price_distance
+                    if new_stop > trailing_stop_price:
+                        old_stop = trailing_stop_price
+
+                        # Modificar SL no MT5
                         try:
-                            self.mt5.modify_position(
-                                ticket=pos.get('ticket'),
-                                sl=new_stop,
-                                tp=0
-                            )
+                            self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
                             movimento = new_stop - old_stop
-                            print(f"[WORKER] Trailing subiu: ${old_stop:.2f} -> ${new_stop:.2f} (+{movimento:.2f})")
-                            updated = True
+                            print(f"[WORKER] Trailing subiu: ${old_stop:.2f} -> ${new_stop:.2f} (+${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
+
+                            # Atualizar dicionário
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
+                            return True
                         except Exception as e:
                             print(f"[WORKER] Erro ao subir trailing: {e}")
 
-                else:  # SELL - trailing desce
-                    new_stop = current_price + self.current_trailing_distance_pontos
-                    if new_stop < self.trailing_stop_price:
-                        old_stop = self.trailing_stop_price
-                        self.trailing_stop_price = new_stop
+                else:  # SELL
+                    new_stop = current_price + trailing_price_distance
+                    if new_stop < trailing_stop_price:
+                        old_stop = trailing_stop_price
 
+                        # Modificar SL no MT5
                         try:
-                            self.mt5.modify_position(
-                                ticket=pos.get('ticket'),
-                                sl=new_stop,
-                                tp=0
-                            )
+                            self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
                             movimento = old_stop - new_stop
-                            print(f"[WORKER] Trailing desceu: ${old_stop:.2f} -> ${new_stop:.2f} (+{movimento:.2f})")
-                            updated = True
+                            print(f"[WORKER] Trailing desceu: ${old_stop:.2f} -> ${new_stop:.2f} (-${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
+
+                            # Atualizar dicionário
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
+                            return True
                         except Exception as e:
                             print(f"[WORKER] Erro ao descer trailing: {e}")
-
-                return updated
 
             return False
 
@@ -1176,223 +1415,242 @@ class GoldLossZeroSimple:
 
     def _manage_position_trailing(self, pos):
         """
-        Gerencia trailing de uma posicao - CORE DA ESTRATÉGIA LOSS ZERO
+        TRAILING STOP SIMPLIFICADO - BASEADO EM DÓLARES
+        - Ativa com $1 de lucro
+        - Protege $0.50 inicialmente
+        - Sobe $1 a cada $1 adicional de lucro
         """
         try:
+            # Obter ticket da posição
+            ticket = pos.get('ticket')
+            if not ticket:
+                return
+
+            print(f"   [TRAILING CHECK #{ticket}] Iniciando verificação de trailing - MÉTODO CHAMADO!")
+
+            # Obter tipo de posição (0=BUY, 1=SELL) - DEFINIR ANTES DE USAR
+            pos_type = pos.get('type', 0)
+
             # Obter preço atual do tick
             tick = self.mt5.get_symbol_info_tick(self.symbol)
             if tick:
-                current_price = tick['bid'] if tick.get('bid', 0) > 0 else tick.get('ask', 0)
+                # CORREÇÃO: Usar preço correto baseado no tipo de posição
+                # BUY: usar ASK (preço de venda) para calcular lucro atual
+                # SELL: usar BID (preço de compra) para calcular lucro atual
+                if pos_type == 0:  # BUY
+                    current_price = tick.get('ask', 0)
+                else:  # SELL
+                    current_price = tick.get('bid', 0)
+
+                # Fallback se preço não estiver disponível
+                if current_price <= 0:
+                    current_price = tick.get('bid', 0) if tick.get('bid', 0) > 0 else tick.get('ask', 0)
             else:
                 current_price = pos.get('price_open', 0)
 
-            # Verificar se entry_price é válido
-            if self.entry_price <= 0:
-                return
-
-            # Obter tipo de posição (0=BUY, 1=SELL)
-            pos_type = pos.get('type', 0)
-
-            # Calcular lucro (converter diferença de preço para pontos MT5)
-            if pos_type == 0:  # BUY
-                profit_price_diff = current_price - self.entry_price
-            else:  # SELL
-                profit_price_diff = self.entry_price - current_price
-
-            # Converter para pontos MT5
-            profit_pontos = profit_price_diff / self.symbol_point
-
-            # Lucro em dinheiro (GOLD - usa point_value)
-            profit_dinheiro = self._pontos_para_dinheiro(profit_pontos)
-
-            # DEBUG: Mostrar status
-            if not self.trailing_active:
-                falta_pontos = self.current_trailing_activation_pontos - profit_pontos
-                falta_dinheiro = self._pontos_para_dinheiro(falta_pontos)
-                print(f"   [AGUARDANDO] Lucro: {profit_pontos:.1f}pts (${profit_dinheiro:.2f}) | Ativa em: {self.current_trailing_activation_pontos:.0f}pts | Faltam: {falta_pontos:.1f}pts (${falta_dinheiro:.2f})")
-                print(f"   [DEBUG] entry_price: ${self.entry_price:.2f}, current_price: ${current_price:.2f}, profit_price_diff: {profit_price_diff:.4f}, symbol_point: {self.symbol_point}")
-
-            # Verificar se atingiu lucro para ATIVAR trailing
-            if not self.trailing_active and profit_pontos >= self.current_trailing_activation_pontos:
-                self.trailing_active = True
-
-                # Converter pontos para variação de preço
-                trailing_price_distance = self.current_trailing_distance_pontos * self.symbol_point
-
-                # Calcular trailing stop price (distância em pontos convertida para preço)
-                if pos_type == 0:  # BUY
-                    self.trailing_stop_price = current_price - trailing_price_distance
-                else:  # SELL
-                    self.trailing_stop_price = current_price + trailing_price_distance
-
-                # Calcular lucro protegido (GOLD - usa point_value)
-                lucro_protegido_pontos = profit_pontos - self.current_trailing_distance_pontos
-                lucro_protegido_dinheiro = self._pontos_para_dinheiro(lucro_protegido_pontos)
-
-                # MODIFICAR SL NO MT5 (mover para trailing)
-                success = self._safe_modify_sl(pos.get('ticket'), self.trailing_stop_price, "ATIVAR")
-                if success:
-                    print(f"   [SL MOVIDO PARA TRAILING] Agora protege lucro!")
-
-                    # REGISTRAR TRAILING STOP ATIVADO
-                    try:
-                        trailing_data = {
-                            'trade_id': self.current_trade_id,
-                            'ticket': pos.get('ticket'),
-                            'symbol': self.symbol,
-                            'action': 'ACTIVATED',
-                            'old_sl_price': pos.get('sl', 0),
-                            'new_sl_price': self.trailing_stop_price,
-                            'current_price': current_price,
-                            'profit_pontos': profit_pontos,
-                            'profit_dinheiro': profit_dinheiro,
-                            'trailing_distance_pontos': self.current_trailing_distance_pontos,
-                            'trailing_distance_dinheiro': trailing_distance_dinheiro,
-                            'reason': f'Trailing activated at {profit_pontos:.1f}pts profit',
-                            'agent_version': "1.0.0"
-                        }
-                        self.btc_logger.log_trailing_stop(trailing_data)
-                        print(f"   [DB] Trailing activation logged")
-                    except Exception as e:
-                        print(f"   [DB] Erro ao logar trailing activation: {e}")
-
+            # Obter entry_price do dicionário
+            entry_price = self.positions_entry_price.get(ticket, pos.get('price_open', 0))
+            if entry_price <= 0:
+                entry_price = pos.get('price_open', 0)
+                if entry_price > 0:
+                    self.positions_entry_price[ticket] = entry_price
                 else:
-                    print(f"   [ERRO] Falha ao mover SL para trailing!")
+                    return
+
+            # USAR LUCRO DIRETO DO MT5 (mais preciso e confiável)
+            mt5_profit_raw = pos.get('profit', 0.0)
+
+            # DEBUG DETALHADO: Verificar exatamente o que o MT5 retorna
+            print(f"   [DEBUG RAW] MT5 profit raw: {mt5_profit_raw} (type: {type(mt5_profit_raw)})")
+
+            # BASEADO NO DEBUG: MT5 já retorna lucro em DÓLARES para conta cents
+            # Não precisamos converter de pontos
+            profit_dinheiro = float(mt5_profit_raw)
+
+            print(f"   [DEBUG] Lucro MT5 (dólares): ${profit_dinheiro:.2f}")
+
+            # DEBUG: Calcular pontos MT5 para validação
+            if pos_type == 0:  # BUY
+                profit_price_diff = current_price - entry_price
+            else:  # SELL
+                profit_price_diff = entry_price - current_price
+
+            # Converter diferença de preço para pontos MT5
+            profit_pontos_mt5 = profit_price_diff / self.symbol_point
+            profit_calculado = profit_pontos_mt5 * self.point_value * self.volume
+
+            print(f"   [DEBUG] Diferença preço: {profit_price_diff:.3f} | Pontos MT5: {profit_pontos_mt5:.1f}")
+            print(f"   [DEBUG] Cálculo manual: {profit_pontos_mt5:.1f} pts * {self.point_value:.4f} * {self.volume} = ${profit_calculado:.4f}")
+
+            # Verificar se MT5 está correto
+            diff = abs(profit_dinheiro - profit_calculado)
+            if diff < 0.01:
+                print(f"   [DEBUG] ✅ MT5 e cálculo manual compatíveis")
+            else:
+                print(f"   [DEBUG] ⚠️ Diferença: MT5=${profit_dinheiro:.2f} vs Calculado=${profit_calculado:.4f} (diff=${diff:.4f})")
+
+            # Obter estado de trailing desta posição
+            trailing_active = self.positions_trailing_active.get(ticket, False)
+            trailing_stop_price = self.positions_trailing_stop.get(ticket, 0.0)
+
+            # DEBUG: Mostrar status se não ativo
+            if not trailing_active:
+                falta_dinheiro = self.trailing_activation_dollar - profit_dinheiro
+                print(f"   [AGUARDANDO #{ticket}] Lucro: ${profit_dinheiro:.2f} | Ativa em: ${self.trailing_activation_dollar:.2f} | Faltam: ${falta_dinheiro:.2f}")
+
+            # ATIVAR TRAILING quando atingir $1 de lucro
+            if not trailing_active and profit_dinheiro >= self.trailing_activation_dollar:
+                # Calcular trailing stop inicial: protege $0.50 de lucro
+                # Para SELL: SL deve ficar ACIMA do preço atual para proteger lucro
+                # Para BUY: SL deve ficar ABAIXO do preço atual para proteger lucro
+
+                # Diferença de preço equivalente a $0.50 de lucro
+                # $0.50 / (point_value * volume) = pontos necessários
+                pontos_para_proteger = self.trailing_distance_dollar / (self.point_value * self.volume)
+                trailing_price_distance = pontos_para_proteger * self.symbol_point
+
+                print(f"   [TRAILING CALC] Protegendo ${self.trailing_distance_dollar:.2f}")
+                print(f"   [TRAILING CALC] Pontos necessários: {pontos_para_proteger:.1f}")
+                print(f"   [TRAILING CALC] Distância preço: {trailing_price_distance:.3f}")
+
+                # Calcular trailing stop price
+                if pos_type == 0:  # BUY - SL abaixo do preço atual
+                    trailing_stop_price = current_price - trailing_price_distance
+                    print(f"   [TRAILING CALC] BUY: {current_price:.3f} - {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
+                else:  # SELL - SL acima do preço atual
+                    trailing_stop_price = current_price + trailing_price_distance
+                    print(f"   [TRAILING CALC] SELL: {current_price:.3f} + {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
+
+                # Salvar no dicionário desta posição
+                self.positions_trailing_active[ticket] = True
+                self.positions_trailing_stop[ticket] = trailing_stop_price
+
+                # Compatibilidade com variáveis únicas
+                self.trailing_active = True
+                self.trailing_stop_price = trailing_stop_price
+
+                # Modificar SL no MT5
+                success = self._safe_modify_sl(ticket, trailing_stop_price, "ATIVAR")
+                if success:
+                    print(f"   [TRAILING ATIVADO #{ticket}] Protege ${self.trailing_distance_dollar:.2f} de lucro!")
 
                 print(f"")
                 print(f"{'='*60}")
-                print(f"[TRAILING ATIVADO]")
-                print(f"   Lucro atual: {profit_pontos:.1f} pts (${profit_dinheiro:.2f})")
-                print(f"   Trailing ativou em: {self.current_trailing_activation_pontos:.0f} pts")
-                print(f"   Trailing Stop: ${self.trailing_stop_price:.2f}")
-                print(f"   Distancia: {self.current_trailing_distance_pontos:.0f} pts")
-                print(f"   LUCRO MINIMO PROTEGIDO: {lucro_protegido_pontos:.1f} pts (${lucro_protegido_dinheiro:.2f})")
+                print(f"[TRAILING ATIVADO - SIMPLIFICADO]")
+                print(f"   Lucro atual: ${profit_dinheiro:.2f}")
+                print(f"   Trailing ativou em: ${self.trailing_activation_dollar:.2f}")
+                print(f"   Trailing Stop: ${trailing_stop_price:.2f}")
+                print(f"   Protege: ${self.trailing_distance_dollar:.2f} de lucro")
                 print(f"   A partir de agora: IMPOSSIVEL PERDER!")
                 print(f"{'='*60}")
                 print(f"")
 
-            # Atualizar trailing (SOBE/DESCE COM O PREÇO)
-            if self.trailing_active:
-                # Calcular lucro protegido atual (GOLD - converter preço para pontos)
-                if pos_type == 0:  # BUY
-                    lucro_protegido_price_diff = self.trailing_stop_price - self.entry_price
-                else:  # SELL
-                    lucro_protegido_price_diff = self.entry_price - self.trailing_stop_price
+            # ATUALIZAR TRAILING se já ativo
+            if trailing_active:
+                # DEBUG: Mostrar cálculo detalhado do trailing
+                print(f"   [TRAILING UPDATE #{ticket}] Lucro atual: ${profit_dinheiro:.2f}")
 
-                # Converter diferença de preço para pontos MT5
-                lucro_protegido_pontos = lucro_protegido_price_diff / self.symbol_point
-                lucro_protegido_dinheiro = self._pontos_para_dinheiro(lucro_protegido_pontos)
+                # Calcular quantos "níveis" de $1 o lucro atingiu
+                # Exemplo: $2.50 de lucro = nível 2 (protege $0.50 + $1.00 + $1.00 = $2.50)
+                profit_levels = int(profit_dinheiro // self.trailing_step_dollar) + 1  # +1 para o nível inicial
+                trailing_distance_dinheiro = self.trailing_distance_dollar + (profit_levels - 1) * self.trailing_step_dollar
 
-                print(f"   [TRAILING ATIVO] Lucro: {profit_pontos:.1f}pts (${profit_dinheiro:.2f}) | Protegido: {lucro_protegido_pontos:.1f}pts (${lucro_protegido_dinheiro:.2f}) | Stop: ${self.trailing_stop_price:.2f}")
+                print(f"   [TRAILING CALC] Níveis: {profit_levels} | Distância: ${trailing_distance_dinheiro:.2f}")
 
-                # Converter pontos para variação de preço
-                trailing_price_distance = self.current_trailing_distance_pontos * self.symbol_point
+                # Garantir que não protege mais que o lucro atual
+                trailing_distance_dinheiro = min(trailing_distance_dinheiro, profit_dinheiro - 0.01)  # Deixar $0.01 de margem
 
-                # Para posições BUY: trailing SOBE com o preço
+                print(f"   [TRAILING CALC] Distância final: ${trailing_distance_dinheiro:.2f}")
+
+                # Converter distância em dólares para variação de preço
+                # Formula correta: dólares / (point_value * volume) = pontos MT5
+                # pontos MT5 * symbol_point = variação de preço
+                pontos_mt5 = trailing_distance_dinheiro / (self.point_value * self.volume)
+                trailing_price_distance = pontos_mt5 * self.symbol_point
+
+                print(f"   [TRAILING CALC] Distância preço: {trailing_price_distance:.3f}")
+
+                # Calcular novo trailing stop
                 if pos_type == 0:  # BUY
                     new_stop = current_price - trailing_price_distance
-                    if new_stop > self.trailing_stop_price:
-                        old_stop = self.trailing_stop_price
-                        self.trailing_stop_price = new_stop
+                    print(f"   [TRAILING CALC] BUY: {current_price:.3f} - {trailing_price_distance:.3f} = {new_stop:.3f}")
+                    print(f"   [TRAILING CALC] Stop atual: {trailing_stop_price:.3f} | Novo: {new_stop:.3f}")
+
+                    if new_stop > trailing_stop_price:
+                        old_stop = trailing_stop_price
                         movimento = new_stop - old_stop
 
-                        # MODIFICAR SL NO MT5
-                        try:
-                            self.mt5.modify_position(
-                                ticket=pos.get('ticket'),
-                                sl=new_stop,
-                                tp=0
-                            )
-                            print(f"   [TRAILING SUBIU]: ${old_stop:.2f} -> ${new_stop:.2f} (+{movimento:.2f}) [OK]")
+                        # Modificar SL no MT5 usando método seguro
+                        success = self._safe_modify_sl(ticket, new_stop, f"TRAILING_SUBIU_{movimento:.2f}")
+                        if success:
+                            print(f"   [TRAILING SUBIU #{ticket}]: ${old_stop:.2f} -> ${new_stop:.2f} (+${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
 
-                            # REGISTRAR TRAILING STOP MOVIMENTO
-                            try:
-                                trailing_data = {
-                                    'trade_id': self.current_trade_id,
-                                    'ticket': pos.get('ticket'),
-                                    'symbol': self.symbol,
-                                    'action': 'MOVED_UP',
-                                    'old_sl_price': old_stop,
-                                    'new_sl_price': new_stop,
-                                    'current_price': current_price,
-                                    'profit_pontos': profit_pontos,
-                                    'profit_dinheiro': profit_dinheiro,
-                                    'trailing_distance_pontos': self.current_trailing_distance_pontos,
-                                    'trailing_distance_dinheiro': self._pontos_para_dinheiro(self.current_trailing_distance_pontos),
-                                    'reason': f'Trailing moved up by {movimento:.2f}',
-                                    'agent_version': "1.0.0"
-                                }
-                                self.btc_logger.log_trailing_stop(trailing_data)
-                            except Exception as e:
-                                print(f"   [DB] Erro ao logar trailing move up: {e}")
+                            # Atualizar dicionário
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
+                        else:
+                            print(f"   [ERRO] Falha ao subir trailing: MT5 rejeitou modificação")
 
-                        except Exception as e:
-                            print(f"   [ERRO] Falha ao atualizar trailing: {e}")
-
-                # Para posições SELL: trailing DESCE com o preço
                 else:  # SELL
                     new_stop = current_price + trailing_price_distance
-                    if new_stop < self.trailing_stop_price:
-                        old_stop = self.trailing_stop_price
-                        self.trailing_stop_price = new_stop
+                    print(f"   [TRAILING CALC] SELL: {current_price:.3f} + {trailing_price_distance:.3f} = {new_stop:.3f}")
+                    print(f"   [TRAILING CALC] Stop atual: {trailing_stop_price:.3f} | Novo: {new_stop:.3f}")
+
+                    if new_stop < trailing_stop_price:
+                        old_stop = trailing_stop_price
                         movimento = old_stop - new_stop
 
-                        # MODIFICAR SL NO MT5
+                        # Modificar SL no MT5
                         try:
-                            self.mt5.modify_position(
-                                ticket=pos.get('ticket'),
-                                sl=new_stop,
-                                tp=0
-                            )
-                            print(f"   [TRAILING DESCEU]: ${old_stop:.2f} -> ${new_stop:.2f} (-{movimento:.2f}) [OK]")
+                            self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
+                            print(f"   [TRAILING DESCEU #{ticket}]: ${old_stop:.2f} -> ${new_stop:.2f} (-${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
 
-                            # REGISTRAR TRAILING STOP MOVIMENTO
-                            try:
-                                trailing_data = {
-                                    'trade_id': self.current_trade_id,
-                                    'ticket': pos.get('ticket'),
-                                    'symbol': self.symbol,
-                                    'action': 'MOVED_DOWN',
-                                    'old_sl_price': old_stop,
-                                    'new_sl_price': new_stop,
-                                    'current_price': current_price,
-                                    'profit_pontos': profit_pontos,
-                                    'profit_dinheiro': profit_dinheiro,
-                                    'trailing_distance_pontos': self.current_trailing_distance_pontos,
-                                    'trailing_distance_dinheiro': self._pontos_para_dinheiro(self.current_trailing_distance_pontos),
-                                    'reason': f'Trailing moved down by {movimento:.2f}',
-                                    'agent_version': "1.0.0"
-                                }
-                                self.btc_logger.log_trailing_stop(trailing_data)
-                            except Exception as e:
-                                print(f"   [DB] Erro ao logar trailing move down: {e}")
+                            # Atualizar dicionário
+                            self.positions_trailing_stop[ticket] = new_stop
+                            self.trailing_stop_price = new_stop
 
                         except Exception as e:
-                            print(f"   [ERRO] Falha ao atualizar trailing: {e}")
+                            print(f"   [ERRO] Falha ao descer trailing: {e}")
+
+                # Mostrar status atual
+                lucro_protegido = profit_dinheiro - trailing_distance_dinheiro
+                print(f"   [TRAILING ATIVO #{ticket}] Lucro: ${profit_dinheiro:.2f} | Protegido: ${lucro_protegido:.2f} | Stop: ${trailing_stop_price:.2f}")
 
         except Exception as e:
             print(f"Erro ao gerenciar posicao: {e}")
 
-    def _calculate_stop_level(self, pos_type: int, current_price: float) -> float:
+    def _get_trade_id_for_logging(self, ticket: int) -> int:
         """
-        Calcula nivel do trailing stop
+        Obtém o trade_id para logging, buscando no banco se necessário.
         """
-        if pos_type == 0:  # BUY
-            return current_price * (1 - self.trailing_distance / 100)
-        else:  # SELL
-            return current_price * (1 + self.trailing_distance / 100)
+        # Prioridade 1: Usar o ID em memória se disponível
+        if self.current_trade_id and self.last_position_ticket == ticket:
+            return self.current_trade_id
+
+        # Prioridade 2: Buscar no banco de dados pelo ticket
+        try:
+            from core.btc_logger import BTCLogger
+            btc_logger = BTCLogger()
+            trade_id = btc_logger.get_trade_id_by_ticket(ticket)
+
+            if trade_id:
+                # Atualiza o ID em memória para otimizar futuras chamadas
+                self.current_trade_id = trade_id
+                self.last_position_ticket = ticket
+                print(f"   [DB] Trade ID {trade_id} recuperado para o ticket {ticket}")
+                return trade_id
+            else:
+                print(f"   [DB] AVISO: Trade ID não encontrado no banco para o ticket {ticket}.")
+                return None
+
+        except Exception as e:
+            print(f"   [DB] ERRO ao buscar trade_id pelo ticket {ticket}: {e}")
+            return None
 
     def _safe_modify_sl(self, ticket: int, new_sl: float, action: str) -> bool:
         """
         Modifica Stop Loss de forma segura com logs detalhados e retry
-        
-        Args:
-            ticket: Ticket da posição
-            new_sl: Novo preço do Stop Loss
-            action: Ação sendo executada ("ATIVAR", "ATUALIZAR", "SUBIR", "DESCER")
-            
-        Returns:
-            True se modificou com sucesso, False caso contrário
+        CORRIGIDO: Executa realmente no MT5
         """
         try:
             # Verificar se MT5 está conectado
@@ -1411,10 +1669,12 @@ class GoldLossZeroSimple:
                 return False
             
             # Obter posição atual para verificar se existe
-            position = self.mt5.positions_get_by_ticket(ticket)
-            if not position:
+            positions = self.mt5.positions_get(ticket=ticket)
+            if not positions or len(positions) == 0:
                 print(f"   [ERRO] Posição não encontrada - Ticket: {ticket}")
                 return False
+            
+            position = positions[0]  # Pegar primeira posição
             
             # Usar lock para evitar conflitos entre threads
             with self._trailing_lock:
@@ -1424,71 +1684,113 @@ class GoldLossZeroSimple:
                     print(f"   [ERRO] Não foi possível obter preço atual")
                     return False
                 
-                current_price = tick['bid'] if position[0]['type'] == 0 else tick['ask']
+                current_price = tick['bid'] if position['type'] == 0 else tick['ask']
                 
                 # Calcular distância do preço atual
-                if position[0]['type'] == 0:  # BUY
+                if position['type'] == 0:  # BUY
                     distance_pct = ((current_price - new_sl) / current_price) * 100
                     direction = "acima"
                 else:  # SELL
                     distance_pct = ((new_sl - current_price) / current_price) * 100
                     direction = "abaixo"
                 
-                # Verificar se distância é muito pequena (evitar modificações desnecessárias)
-                if distance_pct < 0.001:  # 0.001%
-                    print(f"   [INFO] Distância muito pequena ({distance_pct:.4f}%), pulando modificação")
-                    return False
-                
                 # Log da tentativa
                 print(f"   [MT5] Tentando {action} SL - Ticket: {ticket}")
                 print(f"   [MT5] Preço atual: ${current_price:.2f}")
                 print(f"   [MT5] Novo SL: ${new_sl:.2f} ({distance_pct:.4f}% {direction})")
+                print(f"   [MT5] Posição atual SL: ${position.get('sl', 'N/A')}")
                 
-                # Tentar modificar posição
-                result = self.mt5.modify_position(
-                    ticket=ticket,
-                    sl=new_sl,
-                    tp=0  # Manter TP inalterado
-                )
+                # CORREÇÃO: Pular verificação de distância pequena APENAS se NÃO for a ativação inicial.
+                # A ativação inicial DEVE sempre ser executada.
+                if action != "ATIVAR":
+                    # Verificar se distância é muito pequena (evitar modificações desnecessárias)
+                    if abs(new_sl - position.get('sl', 0)) < self.symbol_point:
+                        print(f"   [INFO] Modificação de SL muito pequena, pulando.")
+                        return False
+
+                # MÚLTIPLAS TENTATIVAS com diferentes abordagens
+                for attempt in range(3):
+                    try:
+                        print(f"   [MT5] Tentativa {attempt + 1}/3...")
+                        
+                        # MÉTODO 1: Modificação direta (mais comum)
+                        result = self.mt5.order_send({
+                            "action": mt5.TRADE_ACTION_SLTP,
+                            "symbol": self.symbol,
+                            "position": ticket,
+                            "sl": new_sl,
+                            "tp": position.get('tp', 0),  # Manter TP atual
+                        })
+                        
+                        # Verificar resultado da tentativa
+                        if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
+                            print(f"   [MT5] ✅ SUCESSO! SL modificado para ${new_sl:.2f}")
+                            print(f"   [MT5] Ticket: {ticket} | Ação: {action}")
+                            
+                            # Atualizar timestamp da última modificação
+                            self._last_sl_modification = time.time()
+                            return True
+                        else:
+                            # Log do erro detalhado
+                            error_code = result.get('retcode', 'Unknown') if result else 'No result'
+                            error_desc = result.get('comment', 'No description') if result else 'No result'
+                            
+                            print(f"   [MT5] ❌ Tentativa {attempt + 1} falhou")
+                            print(f"   [MT5] Erro: {error_code} - {error_desc}")
+                            
+                            # Se falhou por distância, tentar abordagem diferente
+                            if error_code == 130:  # Invalid stops
+                                print(f"   [MT5] Problema de distância, ajustando...")
+                                # Manter distância mínima
+                                if position['type'] == 0:  # BUY
+                                    new_sl = current_price - 0.1  # Mínimo 0.1
+                                else:  # SELL  
+                                    new_sl = current_price + 0.1  # Mínimo 0.1
+                                print(f"   [MT5] Novo SL ajustado para: ${new_sl:.2f}")
+                    
+                    except Exception as inner_e:
+                        print(f"   [MT5] Exceção na tentativa {attempt + 1}: {inner_e}")
+                    
+                    # Aguardar antes da próxima tentativa (exceto na última)
+                    if attempt < 2:
+                        print(f"   [MT5] Aguardando 0.5s antes da próxima tentativa...")
+                        time.sleep(0.5)
                 
-                # Verificar resultado
-                if result and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
-                    print(f"   [MT5] ✅ Sucesso! SL modificado para ${new_sl:.2f}")
+                # TODAS AS TENTATIVAS FALHARAM
+                print(f"   [MT5] ❌ TODAS AS TENTATIVAS FALHARAM")
+                print(f"   [MT5] Ticket: {ticket} | Novo SL: ${new_sl:.2f}")
+                print(f"   [MT5] Ação: {action}")
+                
+                # TENTATIVA FINAL: Diretamente através do MT5 se disponível
+                try:
+                    print(f"   [MT5] Tentativa FINAL usando order_send...")
+
+                    # Construir request manualmente (sem type_filling para SLTP)
+                    request = {
+                        "action": mt5.TRADE_ACTION_SLTP,
+                        "symbol": self.symbol,
+                        "position": ticket,
+                        "sl": new_sl,
+                        "tp": position.get('tp', 0),
+                    }
+
+                    result_final = self.mt5.order_send(request)
                     
-                    # Atualizar timestamp da última modificação
-                    self._last_sl_modification = time.time()
-                    return True
-                else:
-                    # Log do erro detalhado
-                    error_code = result.get('retcode', 'Unknown') if result else 'No result'
-                    error_desc = result.get('comment', 'No description') if result else 'No result'
-                    
-                    print(f"   [MT5] ❌ Falha ao modificar SL")
-                    print(f"   [MT5] Erro: {error_code} - {error_desc}")
-                    
-                    # Tentar novamente após 1 segundo (retry)
-                    print(f"   [MT5] Aguardando 1s antes do retry...")
-                    time.sleep(1)
-                    
-                    result_retry = self.mt5.modify_position(
-                        ticket=ticket,
-                        sl=new_sl,
-                        tp=0
-                    )
-                    
-                    if result_retry and result_retry.get('retcode') == 10009:
-                        print(f"   [MT5] ✅ Sucesso no retry! SL modificado para ${new_sl:.2f}")
+                    if result_final and result_final.get('retcode') == 10009:
+                        print(f"   [MT5] ✅ SUCESSO NA TENTATIVA FINAL!")
                         self._last_sl_modification = time.time()
                         return True
                     else:
-                        error_code_retry = result_retry.get('retcode', 'Unknown') if result_retry else 'No result'
-                        error_desc_retry = result_retry.get('comment', 'No description') if result_retry else 'No result'
-                        print(f"   [MT5] ❌ Falha no retry também")
-                        print(f"   [MT5] Erro retry: {error_code_retry} - {error_desc_retry}")
-                        return False
+                        error_final = result_final.get('comment', 'Unknown') if result_final else 'No result'
+                        print(f"   [MT5] ❌ Tentativa final também falhou: {error_final}")
+                        
+                except Exception as final_e:
+                    print(f"   [MT5] ❌ Erro na tentativa final: {final_e}")
+                
+                return False
                         
         except Exception as e:
-            print(f"   [MT5] ❌ Exceção ao modificar SL: {e}")
+            print(f"   [MT5] ❌ Exceção geral ao modificar SL: {e}")
             return False
 
     def _get_time(self):
@@ -1497,3 +1799,37 @@ class GoldLossZeroSimple:
         """
         from datetime import datetime
         return datetime.now().strftime("%H:%M:%S")
+    
+    def _calculate_signal_strength(self, signal: dict) -> str:
+        """
+        Calcula força do sinal baseado em confirmações
+        
+        Args:
+            signal: Dicionário com informações do sinal
+            
+        Returns:
+            "STRONG" | "MODERATE" | "WEAK"
+        """
+        confirmations = 0
+        reason = signal.get('reason', '').lower()
+        
+        # Contar confirmações no reason
+        if 'downtrend' in reason or 'uptrend' in reason:
+            confirmations += 1
+        
+        if 'momentum' in reason:
+            confirmations += 1
+        
+        if 'volume' in reason or 'volatility' in reason:
+            confirmations += 1
+        
+        if 'm15_confirm' in reason or 'confirmed' in reason:
+            confirmations += 1
+        
+        # Classificar força
+        if confirmations >= 3:
+            return "STRONG"
+        elif confirmations >= 2:
+            return "MODERATE"
+        else:
+            return "WEAK"

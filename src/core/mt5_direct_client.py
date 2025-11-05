@@ -45,9 +45,64 @@ class MT5Client:
         """Converte named tuple do MT5 para dict."""
         if obj is None:
             return None
+
+        # Se já for dict, retorna como está
+        if isinstance(obj, dict):
+            return obj
+
+        # Se for named tuple (resultado do MT5)
         if hasattr(obj, '_asdict'):
-            return obj._asdict()
-        return obj
+            try:
+                return obj._asdict()
+            except Exception as e:
+                logger.error(f"Erro ao converter named tuple MT5: {e}")
+                return None
+
+        # Se for um objeto com atributos (como TradeRequest, TradeResult, etc)
+        if hasattr(obj, '__dict__'):
+            try:
+                return obj.__dict__
+            except Exception as e:
+                logger.error(f"Erro ao converter objeto MT5 com __dict__: {e}")
+                return None
+
+        # Para objetos MT5 específicos, tentar acessar atributos diretamente
+        try:
+            # Verificar se é um objeto MT5 com atributos específicos
+            result_dict = {}
+            attrs_to_check = ['retcode', 'deal', 'order', 'volume', 'price', 'comment', 'request', 'action', 'symbol']
+
+            for attr in attrs_to_check:
+                if hasattr(obj, attr):
+                    try:
+                        value = getattr(obj, attr)
+                        # Se o valor for outro objeto MT5, tentar converter recursivamente
+                        if hasattr(value, '_asdict'):
+                            value = value._asdict()
+                        elif hasattr(value, '__dict__'):
+                            value = value.__dict__
+                        result_dict[attr] = value
+                    except:
+                        pass
+
+            if result_dict:
+                return result_dict
+
+        except Exception as e:
+            logger.error(f"Erro ao acessar atributos do objeto MT5: {e}")
+
+        # Para outros tipos, tenta converter para dict se possível
+        try:
+            # Verificar se é iterável e tem chaves (dict-like)
+            if hasattr(obj, '__iter__') and hasattr(obj, 'keys'):
+                return dict(obj)
+            # Se não conseguir converter, retornar None para indicar erro
+            else:
+                logger.warning(f"Não foi possível converter objeto MT5 para dict: {type(obj)} - {obj}")
+                return None
+        except Exception as e:
+            logger.error(f"Erro ao converter objeto MT5 para dict: {e}")
+            return None
 
     # ==================== Account Information ====================
 
@@ -373,6 +428,25 @@ class MT5Client:
             request["sl"] = sl
         if tp and tp > 0:
             request["tp"] = tp
+
+        result = mt5.order_send(request)
+        if result is None:
+            logger.error(f"Erro ao enviar ordem: {mt5.last_error()}")
+            return None
+
+        return self._to_dict(result)
+
+    def order_send(self, request: dict) -> Optional[Dict[str, Any]]:
+        """
+        Envia uma ordem genérica para o MT5.
+
+        Args:
+            request: Dicionário com os parâmetros da ordem
+
+        Returns:
+            Resultado da operação ou None se falhar
+        """
+        self._ensure_initialized()
 
         result = mt5.order_send(request)
         if result is None:

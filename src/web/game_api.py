@@ -22,8 +22,8 @@ from core.mt5_direct_client import get_mt5_client
 # Blueprint
 game_bp = Blueprint('game', __name__)
 
-# Database path
-DB_PATH = Path(__file__).parent.parent.parent / 'trading.db'
+# Database path - CONSOLIDADO: Usar mesmo banco que BTCLogger
+DB_PATH = Path(__file__).parent.parent.parent / 'btc_trading_logs.db'
 
 # Game state with FIXED magic number for history persistence
 GAME_MAGIC_NUMBER = 777777  # Fixed magic number for Gold Game
@@ -265,12 +265,12 @@ def get_prediction():
         tick = mt5.get_symbol_info_tick("XAUUSDc")
         price = tick['bid'] if tick else 0
         
-        # Get last 20 candles for chart
+        # Get last 200 candles for chart (more candles, less stretched)
         rates = mt5.copy_rates_from_pos(
             symbol="XAUUSDc",
             timeframe="M1",
             start_pos=0,
-            count=20
+            count=200
         )
         
         candles = []
@@ -762,43 +762,43 @@ def _predict_next_candle(mt5) -> Dict:
     try:
         print("[PREDICTION] Starting analysis...")
         
-        # === M5 Confirmation ===
-        rates_m5 = mt5.copy_rates_from_pos(
+        # === M1 Confirmation ===
+        rates_m1_confirm = mt5.copy_rates_from_pos(
             symbol="XAUUSDc",
-            timeframe="M5",
+            timeframe="M1",
             start_pos=0,
             count=30
         )
         
-        print(f"[PREDICTION] M5 candles: {len(rates_m5) if rates_m5 else 0}")
+        print(f"[PREDICTION] M1 candles: {len(rates_m1_confirm) if rates_m1_confirm else 0}")
         
-        if not rates_m5 or len(rates_m5) < 10:
-            print("[PREDICTION] ERROR: Insufficient M5 data")
-            return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "Insufficient M5 data"}
+        if not rates_m1_confirm or len(rates_m1_confirm) < 10:
+            print("[PREDICTION] ERROR: Insufficient M1 data")
+            return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "Insufficient M1 data"}
         
-        closes_m5 = [r['close'] for r in rates_m5[:6]]
-        m5_ups = sum([1 for i in range(5) if closes_m5[i] > closes_m5[i+1]])
-        m5_downs = sum([1 for i in range(5) if closes_m5[i] < closes_m5[i+1]])
+        closes_m1 = [r['close'] for r in rates_m1_confirm[:6]]
+        m1_ups = sum([1 for i in range(5) if closes_m1[i] > closes_m1[i+1]])
+        m1_downs = sum([1 for i in range(5) if closes_m1[i] < closes_m1[i+1]])
         
         # Menos rigoroso: 3+ ao invés de 4+
-        m5_uptrend = m5_ups >= 3
-        m5_downtrend = m5_downs >= 3
+        m1_uptrend = m1_ups >= 3
+        m1_downtrend = m1_downs >= 3
         
         # Se empate, usar o que tem mais
-        if m5_ups == m5_downs:
-            m5_uptrend = False
-            m5_downtrend = False
-        elif m5_ups > m5_downs:
-            m5_uptrend = True
-            m5_downtrend = False
+        if m1_ups == m1_downs:
+            m1_uptrend = False
+            m1_downtrend = False
+        elif m1_ups > m1_downs:
+            m1_uptrend = True
+            m1_downtrend = False
         else:
-            m5_uptrend = False
-            m5_downtrend = True
+            m1_uptrend = False
+            m1_downtrend = True
         
-        print(f"[PREDICTION] M5 trend: ups={m5_ups}, downs={m5_downs}, uptrend={m5_uptrend}, downtrend={m5_downtrend}")
+        print(f"[PREDICTION] M1 trend: ups={m1_ups}, downs={m1_downs}, uptrend={m1_uptrend}, downtrend={m1_downtrend}")
         
-        if not m5_uptrend and not m5_downtrend:
-            print("[PREDICTION] No clear M5 trend - analyzing M1 only")
+        if not m1_uptrend and not m1_downtrend:
+            print("[PREDICTION] No clear M1 trend - analyzing M1 only")
             # Continua para análise M1 ao invés de retornar 0
         
         # === M1 Analysis ===
@@ -844,7 +844,7 @@ def _predict_next_candle(mt5) -> Dict:
             return {"type": "WAIT", "score": 0, "confidence": 0, "reason": "High volatility"}
         
         # === BUY Score ===
-        if m5_uptrend or (not m5_downtrend and ups_20 > downs_20):
+        if m1_uptrend or (not m1_downtrend and ups_20 > downs_20):
             score = 0
             
             if ups_20 >= 15:
@@ -884,18 +884,18 @@ def _predict_next_candle(mt5) -> Dict:
             else:
                 signal_type = "WAIT"
             
-            m5_badge = "✓M5" if m5_uptrend else "M1"
+            m1_badge = "✓M1" if m1_uptrend else "M1"
             print(f"[PREDICTION] BUY signal: score={score}, type={signal_type}, confidence={confidence:.1f}")
             
             return {
                 "type": signal_type,
                 "score": score,
                 "confidence": confidence,
-                "reason": f"{m5_badge} | Score:{score} | Up20:{ups_20} Up10:{ups_10} Up5:{ups_5}"
+                "reason": f"{m1_badge} | Score:{score} | Up20:{ups_20} Up10:{ups_10} Up5:{ups_5}"
             }
         
         # === SELL Score ===
-        if m5_downtrend or (not m5_uptrend and downs_20 > ups_20):
+        if m1_downtrend or (not m1_uptrend and downs_20 > ups_20):
             score = 0
             
             if downs_20 >= 15:
@@ -935,14 +935,14 @@ def _predict_next_candle(mt5) -> Dict:
             else:
                 signal_type = "WAIT"
             
-            m5_badge = "✓M5" if m5_downtrend else "M1"
+            m1_badge = "✓M1" if m1_downtrend else "M1"
             print(f"[PREDICTION] SELL signal: score={score}, type={signal_type}, confidence={confidence:.1f}")
             
             return {
                 "type": signal_type,
                 "score": score,
                 "confidence": confidence,
-                "reason": f"{m5_badge} | Score:{score} | Down20:{downs_20} Down10:{downs_10} Down5:{downs_5}"
+                "reason": f"{m1_badge} | Score:{score} | Down20:{downs_20} Down10:{downs_10} Down5:{downs_5}"
             }
         
         print("[PREDICTION] No trend detected after analysis")

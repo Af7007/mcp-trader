@@ -21,16 +21,7 @@ echo    - Fecha par automaticamente quando hedge atinge TP
 echo.
 echo ============================================================
 echo.
-
-set /p CONFIRM="Confirma iniciar operacoes REAIS? (S/N): "
-if /i not "%CONFIRM%"=="S" (
-    echo.
-    echo Operacao cancelada.
-    pause
-    exit /b 0
-)
-
-echo.
+echo Iniciando...
 echo Verificando MT5...
 echo.
 

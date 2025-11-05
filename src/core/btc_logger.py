@@ -68,6 +68,8 @@ class BTCLogger:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 cycle_id INTEGER,
+                ticket INTEGER,
+                magic_number INTEGER,
                 symbol TEXT,
                 trade_type TEXT,
                 entry_price REAL,
@@ -205,18 +207,23 @@ class BTCLogger:
     def log_trade(self, trade_data: dict, cycle_id: int = None):
         """
         Registra um trade executado
+        
+        Returns:
+            int: ID do trade inserido
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         cursor.execute('''
             INSERT INTO trades (
-                cycle_id, symbol, trade_type, entry_price, sl_price, tp_price,
+                cycle_id, ticket, magic_number, symbol, trade_type, entry_price, sl_price, tp_price,
                 volume, strength, reason, comment, status, exit_price,
                 exit_reason, profit_loss, agent_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             cycle_id,
+            trade_data.get('ticket'),
+            trade_data.get('magic_number'),
             trade_data.get('symbol'),
             trade_data.get('trade_type'),
             trade_data.get('entry_price'),
@@ -233,8 +240,11 @@ class BTCLogger:
             trade_data.get('agent_version')
         ))
         
+        trade_id = cursor.lastrowid
         conn.commit()
         conn.close()
+        
+        return trade_id
 
     def log_trailing_stop(self, trailing_data: dict):
         """
@@ -499,3 +509,33 @@ class BTCLogger:
             'win_rate': win_rate,
             'strategy_stats': strategy_stats
         }
+    
+    def get_closed_trades_count(self, symbol: str = None) -> int:
+        """
+        Retorna contagem de trades fechados (CLOSED_WIN ou CLOSED_LOSS)
+        
+        Args:
+            symbol: Filtrar por símbolo (opcional)
+        
+        Returns:
+            Número de trades fechados
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        if symbol:
+            cursor.execute('''
+                SELECT COUNT(*) FROM trades 
+                WHERE status IN ('CLOSED_WIN', 'CLOSED_LOSS')
+                AND symbol = ?
+            ''', (symbol,))
+        else:
+            cursor.execute('''
+                SELECT COUNT(*) FROM trades 
+                WHERE status IN ('CLOSED_WIN', 'CLOSED_LOSS')
+            ''')
+        
+        count = cursor.fetchone()[0]
+        conn.close()
+        
+        return count

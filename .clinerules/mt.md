@@ -1,0 +1,1 @@
+nao use emojis nos codigos

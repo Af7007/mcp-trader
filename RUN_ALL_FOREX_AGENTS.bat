@@ -21,14 +21,6 @@ echo.
 echo ============================================================
 echo.
 
-set /p CONFIRM="Confirma iniciar 3 AGENTES FOREX simultaneos com DINHEIRO REAL? (S/N): "
-if /i not "%CONFIRM%"=="S" (
-    echo.
-    echo Operacao cancelada.
-    pause
-    exit /b 0
-)
-
 echo.
 echo Verificando ambiente...
 echo.
