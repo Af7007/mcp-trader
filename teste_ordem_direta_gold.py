@@ -44,7 +44,7 @@ class TesteOrdemDireta(GoldLossZeroSimple):
         # Parâmetros simplificados para teste rápido
         kwargs.update({
             'check_interval': 2,  # Verifica a cada 2 segundos
-            'volume': 0.03,      # LOTE ALTERADO PARA 0.03!
+            'volume': 0.1,       # LOTE AUMENTADO PARA 0.1!
             'use_buy': True,     # Agora permite BUY e SELL
             'use_sell': True
         })
@@ -93,7 +93,7 @@ class TesteOrdemDireta(GoldLossZeroSimple):
         print("🛡️  SEGURANÇA: Não abre na mesma direção se houver prejuízo")
         print("🔄 EXECUÇÃO: Infinita até Ctrl+C (1 posição por vez)")
         print("🎛️  TRAILING: $1 ativa, protege progressivamente")
-        print("💰 VOLUME: 0.03 lotes (otimizado para conta cents)")
+        print("💰 VOLUME: 0.1 lotes (otimizado para conta cents)")
         print("⏹️  ENCERRAMENTO: Ctrl+C fecha todas as posições")
         print("")
 
