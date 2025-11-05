@@ -1268,9 +1268,9 @@ class GoldLossZeroSimple:
             # USAR LUCRO DIRETO DO MT5 (mais preciso e confiável)
             mt5_profit_raw = pos.get('profit', 0.0)
 
-            # CORREÇÃO: O MT5 sempre retorna lucro em PONTOS MT5, nunca em dólares
-            # Mesmo em contas cents, precisamos converter pontos -> dólares
-            profit_dinheiro = mt5_profit_raw * self.point_value * self.volume
+            # CORREÇÃO: Para contas cents, MT5 retorna lucro DIRETAMENTE em DÓLARES
+            # Não precisamos converter de pontos para dólares
+            profit_dinheiro = float(mt5_profit_raw)
 
             # Obter estado de trailing desta posição
             trailing_active = self.positions_trailing_active.get(ticket, False)
@@ -1460,11 +1460,8 @@ class GoldLossZeroSimple:
             # USAR LUCRO DIRETO DO MT5 (mais preciso e confiável)
             mt5_profit_raw = pos.get('profit', 0.0)
 
-            # DEBUG DETALHADO: Verificar exatamente o que o MT5 retorna
-            print(f"   [DEBUG RAW] MT5 profit raw: {mt5_profit_raw} (type: {type(mt5_profit_raw)})")
-
-            # BASEADO NO DEBUG: MT5 já retorna lucro em DÓLARES para conta cents
-            # Não precisamos converter de pontos
+            # CORREÇÃO: Para contas cents, MT5 retorna lucro DIRETAMENTE em DÓLARES
+            # Não precisamos converter de pontos para dólares
             profit_dinheiro = float(mt5_profit_raw)
 
             print(f"   [DEBUG] Lucro MT5 (dólares): ${profit_dinheiro:.2f}")
