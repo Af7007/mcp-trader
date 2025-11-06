@@ -444,11 +444,20 @@ class GoldLossZeroSimple:
                 # Nenhuma posicao, analisa para abrir
                 self._analyze_and_open()
             else:
-                # Tem posicao, gerencia trailing
+                # Tem posicao
                 print(f"   [POSITIONS] Encontradas {len(positions)} posições abertas")
-                for pos in positions:
-                    self.last_position_ticket = pos.get('ticket')
-                    self._manage_position_trailing(pos)
+
+                # Se worker está ativo, deixa ele cuidar do trailing (20ms checks)
+                # Não faça gerenciamento duplicado no loop principal (15s)
+                if not (self.position_worker and self.position_worker.is_running()):
+                    # Worker NÃO está ativo, gerencia trailing aqui (fallback)
+                    for pos in positions:
+                        self.last_position_ticket = pos.get('ticket')
+                        self._manage_position_trailing(pos)
+                else:
+                    # Worker está ativo - só atualiza last_position_ticket, não faz trailing
+                    for pos in positions:
+                        self.last_position_ticket = pos.get('ticket')
 
         except Exception as e:
             print(f"Erro ao verificar posicoes: {e}")
@@ -1427,9 +1436,14 @@ class GoldLossZeroSimple:
 
             # ATUALIZAR TRAILING se já ativo
             if trailing_active:
-                # Calcular quantos "níveis" de $1 o lucro atingiu
-                profit_levels = int(profit_dinheiro // self.trailing_step_dollar) + 1  # +1 para o nível inicial
-                trailing_distance_dinheiro = self.trailing_distance_dollar + (profit_levels - 1) * self.trailing_step_dollar
+                # Calcular proteção baseada no lucro ACIMA do ponto de ativação ($1.00)
+                # Exemplo:
+                #   $1.00-2.00 lucro: protege $0.50
+                #   $2.00-3.00 lucro: protege $1.50 ($0.50 + 1 nível)
+                #   $3.00-4.00 lucro: protege $2.50 ($0.50 + 2 níveis)
+                additional_profit = max(0, profit_dinheiro - self.trailing_activation_dollar)
+                additional_levels = int(additional_profit // self.trailing_step_dollar)
+                trailing_distance_dinheiro = self.trailing_distance_dollar + additional_levels * self.trailing_step_dollar
 
                 # Garantir que não protege mais que o lucro atual
                 trailing_distance_dinheiro = min(trailing_distance_dinheiro, profit_dinheiro - 0.01)
@@ -1616,15 +1630,14 @@ class GoldLossZeroSimple:
 
             # ATUALIZAR TRAILING se já ativo
             if trailing_active:
-                # DEBUG: Mostrar cálculo detalhado do trailing
-                print(f"   [TRAILING UPDATE #{ticket}] Lucro atual: ${profit_dinheiro:.2f}")
-
-                # Calcular quantos "níveis" de $1 o lucro atingiu
-                # Exemplo: $2.50 de lucro = nível 2 (protege $0.50 + $1.00 + $1.00 = $2.50)
-                profit_levels = int(profit_dinheiro // self.trailing_step_dollar) + 1  # +1 para o nível inicial
-                trailing_distance_dinheiro = self.trailing_distance_dollar + (profit_levels - 1) * self.trailing_step_dollar
-
-                print(f"   [TRAILING CALC] Níveis: {profit_levels} | Distância: ${trailing_distance_dinheiro:.2f}")
+                # Calcular proteção baseada no lucro ACIMA do ponto de ativação ($1.00)
+                # Exemplo:
+                #   $1.00-2.00 lucro: protege $0.50
+                #   $2.00-3.00 lucro: protege $1.50 ($0.50 + 1 nível)
+                #   $3.00-4.00 lucro: protege $2.50 ($0.50 + 2 níveis)
+                additional_profit = max(0, profit_dinheiro - self.trailing_activation_dollar)
+                additional_levels = int(additional_profit // self.trailing_step_dollar)
+                trailing_distance_dinheiro = self.trailing_distance_dollar + additional_levels * self.trailing_step_dollar
 
                 # Garantir que não protege mais que o lucro atual
                 trailing_distance_dinheiro = min(trailing_distance_dinheiro, profit_dinheiro - 0.01)  # Deixar $0.01 de margem
