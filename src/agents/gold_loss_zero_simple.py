@@ -1194,8 +1194,8 @@ class GoldLossZeroSimple:
                             # Usar worker ULTRA para máxima responsividade
                             self._start_ultra_worker()
                         else:
-                            # Worker ULTRA-RÁPIDO para máxima responsividade
-                            worker_interval = 0.1  # 10x por segundo!
+                            # Worker ULTRA-RÁPIDO para máxima responsividade (0.02s = 20ms)
+                            worker_interval = 0.02  # 50x por segundo = 20ms!
                             self.position_worker = PositionMonitorWorker(
                                 mt5_client=self.mt5,
                                 symbol=self.symbol,
@@ -1203,8 +1203,8 @@ class GoldLossZeroSimple:
                                 trailing_callback=self._trailing_worker_callback
                             )
                             self.position_worker.start()
-                            print(f"[WORKER] Monitoramento continuo INICIADO (check: {worker_interval}s)")
-                            print(f"         Trailing sera atualizado em tempo real!")
+                            print(f"[WORKER] Monitoramento ULTRA-RÁPIDO INICIADO (check: {worker_interval*1000:.0f}ms = 50 checks/seg)")
+                            print(f"         Trailing atualizado a cada {worker_interval*1000:.0f}ms!")
                             print(f"")
                 except Exception as e:
                     print(f"[AVISO] Erro ao iniciar worker: {e}")
@@ -1379,19 +1379,11 @@ class GoldLossZeroSimple:
                 pontos_para_proteger = self.trailing_distance_dollar / (self.point_value * self.volume)
                 trailing_price_distance = pontos_para_proteger * self.symbol_point
 
-                print(f"   [TRAILING CALC] Protegendo ${self.trailing_distance_dollar:.2f}")
-                print(f"   [TRAILING CALC] Pontos necessários: {pontos_para_proteger:.1f}")
-                print(f"   [TRAILING CALC] Distância preço: {trailing_price_distance:.3f}")
-
                 # Calcular trailing stop price
                 if pos_type == 0:  # BUY - SL abaixo do preço atual
                     trailing_stop_price = current_price - trailing_price_distance
-                    print(f"   [TRAILING CALC] BUY: {current_price:.3f} - {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
                 else:  # SELL - SL ACIMA do preço atual para proteger lucro
                     trailing_stop_price = current_price + trailing_price_distance
-                    print(f"   [TRAILING CALC] SELL: {current_price:.3f} + {trailing_price_distance:.3f} = {trailing_stop_price:.3f}")
-                    print(f"   [TRAILING CALC] Preço atual: {current_price:.3f} | SL calculado: {trailing_stop_price:.3f}")
-                    print(f"   [TRAILING CALC] SL deve ficar ACIMA do preço atual para SELL")
 
                 # Salvar no dicionário desta posição
                 self.positions_trailing_active[ticket] = True
@@ -1405,8 +1397,9 @@ class GoldLossZeroSimple:
                 try:
                     self.mt5.modify_position(ticket=ticket, sl=trailing_stop_price, tp=None)
 
-                    # LOG TRAILING STOP NO BANCO DE DADOS
+                    # LOG TRAILING STOP NO BANCO DE DADOS (sem prints para velocidade)
                     try:
+                        trailing_distance_dinheiro = self.trailing_distance_dollar
                         trailing_data = {
                             'trade_id': self.current_trade_id,
                             'ticket': ticket,
@@ -1423,11 +1416,10 @@ class GoldLossZeroSimple:
                             'agent_version': '1.3.0'
                         }
                         self.btc_logger.log_trailing_stop(trailing_data)
-                        print(f"[DB] Trailing stop registrado - Trade ID: {self.current_trade_id}")
                     except Exception as db_e:
-                        print(f"[DB] Erro ao registrar trailing: {db_e}")
+                        pass  # Silencioso para performance
 
-                    print(f"\n[WORKER] TRAILING ATIVADO! Lucro: ${profit_dinheiro:.2f} | Protege: ${trailing_distance_dinheiro:.2f}")
+                    print(f"[WORKER] TRAILING ATIVADO! Lucro: ${profit_dinheiro:.2f} | Protege: ${self.trailing_distance_dollar:.2f}")
                     return True
                 except Exception as e:
                     print(f"[WORKER] Erro ao ativar trailing: {e}")
@@ -1457,15 +1449,13 @@ class GoldLossZeroSimple:
                         # Modificar SL no MT5
                         try:
                             self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
-                            movimento = new_stop - old_stop
-                            print(f"[WORKER] Trailing subiu: ${old_stop:.2f} -> ${new_stop:.2f} (+${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
 
                             # Atualizar dicionário
                             self.positions_trailing_stop[ticket] = new_stop
                             self.trailing_stop_price = new_stop
                             return True
                         except Exception as e:
-                            print(f"[WORKER] Erro ao subir trailing: {e}")
+                            logger.error(f"[WORKER] Erro ao subir trailing: {e}")
 
                 else:  # SELL
                     new_stop = current_price + trailing_price_distance
@@ -1475,15 +1465,13 @@ class GoldLossZeroSimple:
                         # Modificar SL no MT5
                         try:
                             self.mt5.modify_position(ticket=ticket, sl=new_stop, tp=None)
-                            movimento = old_stop - new_stop
-                            print(f"[WORKER] Trailing desceu: ${old_stop:.2f} -> ${new_stop:.2f} (-${movimento:.2f}) | Protege: ${trailing_distance_dinheiro:.2f}")
 
                             # Atualizar dicionário
                             self.positions_trailing_stop[ticket] = new_stop
                             self.trailing_stop_price = new_stop
                             return True
                         except Exception as e:
-                            print(f"[WORKER] Erro ao descer trailing: {e}")
+                            logger.error(f"[WORKER] Erro ao descer trailing: {e}")
 
             return False
 
