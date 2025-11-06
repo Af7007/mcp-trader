@@ -104,7 +104,8 @@ class GoldLossZeroSimple:
         self.positions_entry_price = {}  # {ticket: entry_price}
         self.positions_trailing_active = {}  # {ticket: True/False}
         self.positions_trailing_stop = {}  # {ticket: stop_price}
-        self.current_trade_id = None  # ID do trade no banco de dados
+        self.positions_trade_id = {}  # {ticket: trade_id} - IMPORTANTE: Linkar ordem com banco!
+        self.current_trade_id = None  # ID do trade no banco de dados (compatibilidade)
 
         # LOCK para evitar conflitos worker/main thread
         self._trailing_lock = threading.Lock()
@@ -1238,8 +1239,10 @@ class GoldLossZeroSimple:
                     }
                     # Log do trade e obter o trade_id
                     self.current_trade_id = self.btc_logger.log_trade(trade_data)
-                    print(f"   [DB] Trade registrado - ID: {self.current_trade_id}")
-                    print(f"        Ticket: {ticket} | Magic: {magic_number} | Strength: {signal_strength}")
+                    # IMPORTANTE: Linkar ticket com trade_id para trailing stops
+                    self.positions_trade_id[ticket] = self.current_trade_id
+                    print(f"   [DB] Trade registrado - ID: {self.current_trade_id} | Ticket: {ticket}")
+                    print(f"        Magic: {magic_number} | Strength: {signal_strength}")
                 except Exception as e:
                     print(f"   Erro ao logar trade: {e}")
             else:
@@ -1409,8 +1412,10 @@ class GoldLossZeroSimple:
                     # LOG TRAILING STOP NO BANCO DE DADOS (sem prints para velocidade)
                     try:
                         trailing_distance_dinheiro = self.trailing_distance_dollar
+                        # Obter trade_id do dicionário (suporta múltiplas posições)
+                        trade_id = self.positions_trade_id.get(ticket, self.current_trade_id)
                         trailing_data = {
-                            'trade_id': self.current_trade_id,
+                            'trade_id': trade_id,
                             'ticket': ticket,
                             'symbol': self.symbol,
                             'action': 'ACTIVATED',
@@ -1616,6 +1621,30 @@ class GoldLossZeroSimple:
                 success = self._safe_modify_sl(ticket, trailing_stop_price, "ATIVAR")
                 if success:
                     print(f"   [TRAILING ATIVADO #{ticket}] Protege ${self.trailing_distance_dollar:.2f} de lucro!")
+
+                    # LOG TRAILING STOP NO BANCO DE DADOS
+                    try:
+                        trailing_distance_dinheiro = self.trailing_distance_dollar
+                        # Obter trade_id do dicionário (suporta múltiplas posições)
+                        trade_id = self.positions_trade_id.get(ticket, self.current_trade_id)
+                        trailing_data = {
+                            'trade_id': trade_id,
+                            'ticket': ticket,
+                            'symbol': self.symbol,
+                            'action': 'ACTIVATED',
+                            'old_sl_price': None,
+                            'new_sl_price': trailing_stop_price,
+                            'current_price': current_price,
+                            'profit_pontos': mt5_profit_raw,
+                            'profit_dinheiro': profit_dinheiro,
+                            'trailing_distance_pontos': (trailing_distance_dinheiro / self.point_value) / self.volume,
+                            'trailing_distance_dinheiro': trailing_distance_dinheiro,
+                            'reason': f'Trailing activated at ${profit_dinheiro:.2f} profit',
+                            'agent_version': '1.3.0'
+                        }
+                        self.btc_logger.log_trailing_stop(trailing_data)
+                    except Exception as db_e:
+                        logger.error(f"[DB] Erro ao registrar trailing: {db_e}")
 
                 print(f"")
                 print(f"{'='*60}")
