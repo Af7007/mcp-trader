@@ -1746,12 +1746,11 @@ class GoldLossZeroSimple:
                 print(f"   [TRAILING CALC] Distância final: ${trailing_distance_dinheiro:.2f}")
 
                 # Converter distância em dólares para variação de preço
-                # Formula correta: dólares / (point_value * volume) = pontos MT5
-                # pontos MT5 * symbol_point = variação de preço
-                pontos_mt5 = trailing_distance_dinheiro / (self.point_value * self.volume)
-                trailing_price_distance = pontos_mt5 * self.symbol_point
+                # trailing_distance_dinheiro JÁ ESTÁ EM DÓLARES/PREÇO!
+                # Não precisa converter, é direto
+                trailing_price_distance = trailing_distance_dinheiro
 
-                print(f"   [TRAILING CALC] Distância preço: {trailing_price_distance:.3f}")
+                print(f"   [TRAILING CALC] Distância preço: ${trailing_price_distance:.3f}")
 
                 # Calcular novo trailing stop
                 if pos_type == 0:  # BUY
