@@ -848,22 +848,21 @@ class GoldLossZeroSimple:
                     confirmations += 0.5
                     print(f"   [BUY CONF 6] Micro-uptrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos + M15 OBRIGATÓRIO
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("BUY")
 
-                    # M15 é VALIDAÇÃO EXTRA, não bloqueador
+                    # M15 é OBRIGATÓRIO - bloqueia abertura se não confirmar
                     if m15_ok:
                         print(f"   [BUY M15] M15 confirma uptrend! Score: {confirmations}/6")
+                        print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
+                        return {
+                            "type": "BUY",
+                            "price": current,
+                            "reason": f"M5_uptrend_M15_confirmed_score_{confirmations:.1f}"
+                        }
                     else:
-                        print(f"   [BUY M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
-
-                    print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
-                    return {
-                        "type": "BUY",
-                        "price": current,
-                        "reason": f"M5_uptrend_follow_score_{confirmations:.1f}"
-                    }
+                        print(f"   [BUY M15] M15 não confirma - REJEITADO (score M5: {confirmations:.1f})")
 
             # === SINAIS DE SELL (TREND FOLLOWING: MERCADO CAI = VENDER) ===
             # ESTRATÉGIA CORRIGIDA: Acompanhar a tendência, não apostar contra ela
@@ -908,22 +907,21 @@ class GoldLossZeroSimple:
                     confirmations += 0.5
                     print(f"   [SELL CONF 6] Micro-downtrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos + M15 OBRIGATÓRIO
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("SELL")
 
-                    # M15 é VALIDAÇÃO EXTRA, não bloqueador
+                    # M15 é OBRIGATÓRIO - bloqueia abertura se não confirmar
                     if m15_ok:
                         print(f"   [SELL M15] M15 confirma downtrend! Score: {confirmations}/6")
+                        print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
+                        return {
+                            "type": "SELL",
+                            "price": current,
+                            "reason": f"M5_downtrend_M15_confirmed_score_{confirmations:.1f}"
+                        }
                     else:
-                        print(f"   [SELL M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
-
-                    print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
-                    return {
-                        "type": "SELL",
-                        "price": current,
-                        "reason": f"M5_downtrend_follow_score_{confirmations:.1f}"
-                    }
+                        print(f"   [SELL M15] M15 não confirma - REJEITADO (score M5: {confirmations:.1f})")
 
             print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer 2.0+ com micro-trend ou 3.0+ sem)")
             return None
