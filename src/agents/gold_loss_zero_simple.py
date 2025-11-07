@@ -113,8 +113,8 @@ class GoldLossZeroSimple:
 
         # Controle de cooldown entre trades
         self.last_close_time = 0
-        self.cooldown_seconds = 120  # 2 minutos entre trades (evita overtrading)
-        self.cooldown_same_direction = 15  # 15 segundos se mesma direção (aproveita onda!)
+        self.cooldown_seconds = 30  # 30 segundos entre trades diferentes (era 120s = 2min)
+        self.cooldown_same_direction = 10  # 10 segundos se mesma direção (aproveita onda! era 15s)
         self.last_trade_type = None  # Rastrear último tipo (BUY/SELL)
         self.last_trade_was_win = False  # Rastrear se último foi vitória
         self.consecutive_wins_same_direction = 0  # Contador de wins consecutivos na mesma direção
