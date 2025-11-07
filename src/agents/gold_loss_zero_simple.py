@@ -42,7 +42,7 @@ class GoldLossZeroSimple:
         self,
         symbol: str = "XAUUSDc",
         volume: float = 0.03,  # GOLD: 0.03 lotes (aumentado de 0.02)
-        check_interval: int = 15,
+        check_interval: int = 1,  # CHANGED: 15s → 1s (mais responsivo com FALLBACK)
         stop_loss_atr_multiplier: float = 5.0,  # GOLD: SL = ATR × 5.0 (deprecated, usar fixed_sl_dollars)
         fixed_sl_dollars: float = 4.0,  # NOVO: SL fixo em dólares ($4.00)
         use_buy: bool = True,
@@ -143,7 +143,8 @@ class GoldLossZeroSimple:
         self.btc_logger = BTCLogger()
 
         # SL fixo em dólares (removido ATR dinâmico)
-        self.current_sl_pontos = self.fixed_sl_dollars / self.symbol_point if self.symbol_point else 4000
+        # SL é preço absoluto, não precisa converter para pontos
+        self.current_sl_pontos = None  # Deprecado, mantém para compatibilidade
 
         print(f"Agente GOLD Loss Zero - TRAILING SIMPLIFICADO v1.3 GOLD (CORRIGIDO)")
         print(f"   Symbol: {self.symbol}")
@@ -413,7 +414,7 @@ class GoldLossZeroSimple:
                 print(f"   [POSITIONS] Encontradas {len(positions)} posições abertas")
 
                 # Se worker está ativo, deixa ele cuidar do trailing (20ms checks)
-                # Não faça gerenciamento duplicado no loop principal (15s)
+                # Não faça gerenciamento duplicado no loop principal (1s FALLBACK)
                 worker_is_active = self.position_worker and self.position_worker.is_running()
 
                 # DEBUG: Ver status do worker
@@ -428,7 +429,7 @@ class GoldLossZeroSimple:
 
                 if not worker_is_active:
                     # Worker NÃO está ativo, gerencia trailing aqui (fallback)
-                    print(f"   [WORKER] FALLBACK ATIVADO - Gerenciando trailing no loop principal (15s)")
+                    print(f"   [WORKER] FALLBACK ATIVADO - Gerenciando trailing no loop principal (1s)")
                     for pos in positions:
                         self.last_position_ticket = pos.get('ticket')
                         self._manage_position_trailing(pos)
@@ -852,21 +853,22 @@ class GoldLossZeroSimple:
                     confirmations += 0.5
                     print(f"   [BUY CONF 6] Micro-uptrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos + M15 OBRIGATÓRIO
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("BUY")
 
-                    # M15 é OBRIGATÓRIO - bloqueia abertura se não confirmar
+                    # M15 é VALIDAÇÃO EXTRA, não bloqueador - ABRIR MESMO SE M15 NÃO CONFIRMAR
                     if m15_ok:
                         print(f"   [BUY M15] M15 confirma uptrend! Score: {confirmations}/6")
-                        print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
-                        return {
-                            "type": "BUY",
-                            "price": current,
-                            "reason": f"M5_uptrend_M15_confirmed_score_{confirmations:.1f}"
-                        }
                     else:
-                        print(f"   [BUY M15] M15 não confirma - REJEITADO (score M5: {confirmations:.1f})")
+                        print(f"   [BUY M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
+
+                    print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
+                    return {
+                        "type": "BUY",
+                        "price": current,
+                        "reason": f"M5_uptrend_follow_score_{confirmations:.1f}"
+                    }
 
             # === SINAIS DE SELL (TREND FOLLOWING: MERCADO CAI = VENDER) ===
             # ESTRATÉGIA CORRIGIDA: Acompanhar a tendência, não apostar contra ela
@@ -911,21 +913,22 @@ class GoldLossZeroSimple:
                     confirmations += 0.5
                     print(f"   [SELL CONF 6] Micro-downtrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos + M15 OBRIGATÓRIO
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("SELL")
 
-                    # M15 é OBRIGATÓRIO - bloqueia abertura se não confirmar
+                    # M15 é VALIDAÇÃO EXTRA, não bloqueador - ABRIR MESMO SE M15 NÃO CONFIRMAR
                     if m15_ok:
                         print(f"   [SELL M15] M15 confirma downtrend! Score: {confirmations}/6")
-                        print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
-                        return {
-                            "type": "SELL",
-                            "price": current,
-                            "reason": f"M5_downtrend_M15_confirmed_score_{confirmations:.1f}"
-                        }
                     else:
-                        print(f"   [SELL M15] M15 não confirma - REJEITADO (score M5: {confirmations:.1f})")
+                        print(f"   [SELL M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
+
+                    print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
+                    return {
+                        "type": "SELL",
+                        "price": current,
+                        "reason": f"M5_downtrend_follow_score_{confirmations:.1f}"
+                    }
 
             print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer 2.0+ com micro-trend ou 3.0+ sem)")
             return None
@@ -1103,30 +1106,18 @@ class GoldLossZeroSimple:
                 return
 
             # Usar SL fixo em dólares (ao invés de ATR dinâmico)
-            # Converter $4.00 para pontos MT5
-            # Formula correta: sl_pontos = sl_dinheiro / symbol_point
-            # (symbol_point é a menor variação de preço: 0.001 para Gold, 0.0001 para GBP)
+            # SL é PREÇO ABSOLUTO, não precisa converter para pontos
+            # Basta subtrair/adicionar a distância em dinheiro do preço de mercado
             sl_dinheiro = self.fixed_sl_dollars
-            self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
 
-            # Calcular SL (SEM TP - trailing cuida do lucro!)
-            # VERIFICAR symbol_point antes de usar
-            if self.symbol_point is None or self.symbol_point == 0:
-                print(f"[ERRO CRITICO] symbol_point nao inicializado! Recalculando...")
-                self._calculate_point_value()
-                if self.symbol_point is None or self.symbol_point == 0:
-                    print(f"[ERRO CRITICO] Falha ao calcular symbol_point! Usando fallback 0.001")
-                    self.symbol_point = 0.001
-
-            # Converter pontos para variação de preço
-            sl_price_distance = self.current_sl_pontos * self.symbol_point
+            # SL é PREÇO ABSOLUTO, não conversão de pontos
+            # Distância é diretamente em dinheiro
+            sl_price_distance = sl_dinheiro
 
             # DEBUG: Mostrar calculos
             print(f"\n[DEBUG SL CALCULATION] - CRITICAL CHECK")
             print(f"  fixed_sl_dollars PARAMETRO: ${self.fixed_sl_dollars:.2f}")
-            print(f"  symbol_point: {self.symbol_point}")
-            print(f"  current_sl_pontos: {self.current_sl_pontos}")
-            print(f"  sl_price_distance (pontos × point): {sl_price_distance:.3f}")
+            print(f"  sl_price_distance (distância direta): ${sl_price_distance:.3f}")
 
             if signal["type"] == "BUY":
                 market_price = tick['ask']  # Preco de compra
@@ -1233,39 +1224,32 @@ class GoldLossZeroSimple:
                 print(f"")
 
                 # INICIAR WORKER DE MONITORAMENTO CONTINUO
+                # TEMPORARIAMENTE DESABILITAR WORKER ENQUANTO DIAGNOSTICAMOS PROBLEMAS
+                # TODO: Verificar por que PositionMonitorWorker não inicia corretamente
                 try:
-                    if not self.position_worker or not self.position_worker.is_running():
+                    # Desabilitar worker por agora para focar nos problemas críticos (SL, IA)
+                    # O FALLBACK (15s) está funcionando, só é mais lento
+                    USE_WORKER = False  # DESABILITAR TEMPORARIAMENTE
+
+                    if USE_WORKER and (not self.position_worker or not self.position_worker.is_running()):
                         print(f"[WORKER] Iniciando monitoramento contínuo...")
-
-                        # Verificar se deve usar worker ULTRA (para grandes velas)
-                        if hasattr(self, '_start_ultra_worker') and callable(getattr(self, '_start_ultra_worker')):
-                            # Usar worker ULTRA para máxima responsividade
-                            print(f"[WORKER] Usando método ULTRA personalizado")
-                            self._start_ultra_worker()
+                        worker_interval = 0.02
+                        self.position_worker = PositionMonitorWorker(
+                            mt5_client=self.mt5,
+                            symbol=self.symbol,
+                            check_interval=worker_interval,
+                            trailing_callback=self._trailing_worker_callback
+                        )
+                        self.position_worker.start()
+                        if self.position_worker.is_running():
+                            print(f"[WORKER] ✓ ATIVO")
                         else:
-                            # Worker ULTRA-RÁPIDO para máxima responsividade (0.02s = 20ms)
-                            worker_interval = 0.02  # 50x por segundo = 20ms!
-                            print(f"[WORKER] Criando PositionMonitorWorker com intervalo {worker_interval*1000:.0f}ms...")
-                            self.position_worker = PositionMonitorWorker(
-                                mt5_client=self.mt5,
-                                symbol=self.symbol,
-                                check_interval=worker_interval,
-                                trailing_callback=self._trailing_worker_callback
-                            )
-                            print(f"[WORKER] Iniciando thread de monitoramento...")
-                            self.position_worker.start()
+                            print(f"[WORKER] ✗ Falha ao iniciar")
+                    else:
+                        print(f"[WORKER] DESABILITAR TEMPORARIAMENTE - usando FALLBACK a cada 1s")
 
-                            # Verificar se iniciou corretamente
-                            if self.position_worker.is_running():
-                                print(f"[WORKER] ✓ ATIVO - Monitoramento ULTRA-RÁPIDO (check: {worker_interval*1000:.0f}ms = 50 checks/seg)")
-                                print(f"         Trailing atualizado a cada {worker_interval*1000:.0f}ms!")
-                            else:
-                                print(f"[WORKER] ✗ FALHOU ao iniciar - is_running() retornou False")
-                            print(f"")
                 except Exception as e:
-                    print(f"[WORKER] ✗ ERRO ao iniciar: {e}")
-                    logger.exception(f"[WORKER] Erro completo:")
-                    print(f"         Fallback: Monitoramento a cada 15s")
+                    print(f"[WORKER] ERRO: {e}")
                     self.position_worker = None
 
                 # Log do trade no banco de dados
