@@ -1,0 +1,5 @@
+- [ ] Analisar arquivos .md existentes no diretório atual
+- [ ] Criar pasta "md" se não existir
+- [ ] Mover todos os arquivos .md para a pasta "md"
+- [ ] Verificar se todos os arquivos foram movidos corretamente
+- [ ] Confirmar resultado final

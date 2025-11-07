@@ -1,0 +1,5 @@
+- [ ] Verificar arquivos .bat existentes no diretório atual
+- [ ] Criar pasta "bat" se não existir
+- [ ] Mover todos os arquivos .bat para a pasta "bat"
+- [ ] Verificar se todos os arquivos foram movidos corretamente
+- [ ] Confirmar resultado final
