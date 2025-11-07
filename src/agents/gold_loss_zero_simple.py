@@ -418,13 +418,17 @@ class GoldLossZeroSimple:
 
                 # DEBUG: Ver status do worker
                 if self.position_worker:
-                    print(f"   [WORKER STATUS] Existe: True | Rodando: {worker_is_active}")
+                    is_running = self.position_worker.is_running()
+                    print(f"   [WORKER STATUS] Existe: True | Rodando: {is_running}")
+                    if not is_running:
+                        print(f"      ⚠️  Worker criado mas não está rodando! Verificar thread...")
                 else:
-                    print(f"   [WORKER STATUS] Existe: False")
+                    print(f"   [WORKER STATUS] Existe: False ⚠️")
+                    print(f"      Worker não foi inicializado - Verificar logs acima")
 
                 if not worker_is_active:
                     # Worker NÃO está ativo, gerencia trailing aqui (fallback)
-                    print(f"   [WORKER] FALLBACK ATIVADO - Gerenciando trailing no loop principal")
+                    print(f"   [WORKER] FALLBACK ATIVADO - Gerenciando trailing no loop principal (15s)")
                     for pos in positions:
                         self.last_position_ticket = pos.get('ticket')
                         self._manage_position_trailing(pos)
@@ -1230,26 +1234,38 @@ class GoldLossZeroSimple:
                 # INICIAR WORKER DE MONITORAMENTO CONTINUO
                 try:
                     if not self.position_worker or not self.position_worker.is_running():
+                        print(f"[WORKER] Iniciando monitoramento contínuo...")
+
                         # Verificar se deve usar worker ULTRA (para grandes velas)
                         if hasattr(self, '_start_ultra_worker') and callable(getattr(self, '_start_ultra_worker')):
                             # Usar worker ULTRA para máxima responsividade
+                            print(f"[WORKER] Usando método ULTRA personalizado")
                             self._start_ultra_worker()
                         else:
                             # Worker ULTRA-RÁPIDO para máxima responsividade (0.02s = 20ms)
                             worker_interval = 0.02  # 50x por segundo = 20ms!
+                            print(f"[WORKER] Criando PositionMonitorWorker com intervalo {worker_interval*1000:.0f}ms...")
                             self.position_worker = PositionMonitorWorker(
                                 mt5_client=self.mt5,
                                 symbol=self.symbol,
                                 check_interval=worker_interval,
                                 trailing_callback=self._trailing_worker_callback
                             )
+                            print(f"[WORKER] Iniciando thread de monitoramento...")
                             self.position_worker.start()
-                            print(f"[WORKER] Monitoramento ULTRA-RÁPIDO INICIADO (check: {worker_interval*1000:.0f}ms = 50 checks/seg)")
-                            print(f"         Trailing atualizado a cada {worker_interval*1000:.0f}ms!")
+
+                            # Verificar se iniciou corretamente
+                            if self.position_worker.is_running():
+                                print(f"[WORKER] ✓ ATIVO - Monitoramento ULTRA-RÁPIDO (check: {worker_interval*1000:.0f}ms = 50 checks/seg)")
+                                print(f"         Trailing atualizado a cada {worker_interval*1000:.0f}ms!")
+                            else:
+                                print(f"[WORKER] ✗ FALHOU ao iniciar - is_running() retornou False")
                             print(f"")
                 except Exception as e:
-                    print(f"[AVISO] Erro ao iniciar worker: {e}")
-                    print(f"        Fallback: Monitoramento a cada 15s")
+                    print(f"[WORKER] ✗ ERRO ao iniciar: {e}")
+                    logger.exception(f"[WORKER] Erro completo:")
+                    print(f"         Fallback: Monitoramento a cada 15s")
+                    self.position_worker = None
 
                 # Log do trade no banco de dados
                 try:
