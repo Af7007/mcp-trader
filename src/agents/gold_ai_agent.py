@@ -193,6 +193,16 @@ class GoldAIAgent(GoldLossZeroSimple):
                 logger.info("IA recomenda AGUARDAR, usando metodo tradicional M5")
                 return self._analyze_traditional_fallback()
 
+            # VALIDAÇÃO CRÍTICA: Verificar se sinal está alinhado com tendência M5
+            # Evita abrir BUY em downtrend ou SELL em uptrend
+            validation = self._validate_ai_signal_with_m5(ai_decision["action"])
+            if not validation["valid"]:
+                logger.info(f"Sinal IA rejeitado: {validation['reason']}")
+                print(f"   [IA VALIDATION] {validation['reason']}")
+                return self._analyze_traditional_fallback()
+            else:
+                print(f"   [IA VALIDATION] {validation['reason']}")
+
             # Verificar se deve abrir posição
             if not self._should_open_position(ai_decision):
                 logger.info("Nao atende criterios para abertura de posicao")
@@ -447,7 +457,80 @@ class GoldAIAgent(GoldLossZeroSimple):
         if len(self.ai_response_times) > 0:
             avg_response_time = sum(self.ai_response_times) / len(self.ai_response_times)
             logger.info(f"Tempo medio de resposta: {avg_response_time:.2f}s")
-    
+
+    def _validate_ai_signal_with_m5(self, signal_type: str) -> dict:
+        """
+        Valida sinal da IA com análise técnica M5 antes de abrir.
+        Evita abrir BUY em downtrend ou SELL em uptrend (TREND FOLLOWING).
+
+        Args:
+            signal_type: "BUY" ou "SELL" (decisão da IA)
+
+        Returns:
+            {"valid": bool, "reason": str}
+        """
+        try:
+            # Obter dados M5 (mesmo que usa a classe base)
+            rates = self.mt5.copy_rates_from_pos(
+                symbol=self.symbol,
+                timeframe="M5",
+                start_pos=0,
+                count=15
+            )
+
+            if not rates or len(rates) < 8:
+                return {"valid": False, "reason": "Dados M5 insuficientes"}
+
+            # Extrair closes e reverter ordem (MT5 retorna newest first)
+            closes = [r['close'] for r in rates[:15]][::-1]
+
+            # Calcular tendência M5 (GOLD usa 5/8 velas subindo/descendo)
+            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 5  # 5/8 = 62.5%
+            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 5
+
+            # Validar micro-trend (3+ velas consecutivas na mesma direção)
+            micro_uptrend = False
+            micro_downtrend = False
+
+            for i in range(len(closes) - 2):
+                if closes[i] < closes[i+1] < closes[i+2]:
+                    micro_uptrend = True
+                if closes[i] > closes[i+1] > closes[i+2]:
+                    micro_downtrend = True
+
+            # Verificar se sinal da IA está alinhado com tendência M5
+            if signal_type == "BUY":
+                # BUY: precisa de uptrend ou pelo menos micro-uptrend
+                if uptrend or micro_uptrend:
+                    return {
+                        "valid": True,
+                        "reason": f"M5 uptrend confirmado (uptrend: {uptrend}, micro: {micro_uptrend})"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "reason": f"M5 em downtrend/lateral (rejeita BUY)"
+                    }
+
+            elif signal_type == "SELL":
+                # SELL: precisa de downtrend ou pelo menos micro-downtrend
+                if downtrend or micro_downtrend:
+                    return {
+                        "valid": True,
+                        "reason": f"M5 downtrend confirmado (downtrend: {downtrend}, micro: {micro_downtrend})"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "reason": f"M5 em uptrend/lateral (rejeita SELL)"
+                    }
+
+            return {"valid": False, "reason": "Sinal desconhecido"}
+
+        except Exception as e:
+            logger.error(f"Erro ao validar sinal IA com M5: {e}")
+            return {"valid": False, "reason": f"Erro na validação: {e}"}
+
     def _should_open_position(self, ai_decision: Dict) -> bool:
         """
         Verifica se deve abrir posição baseado na decisão da IA
