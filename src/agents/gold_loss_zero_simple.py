@@ -1122,10 +1122,11 @@ class GoldLossZeroSimple:
             sl_price_distance = self.current_sl_pontos * self.symbol_point
 
             # DEBUG: Mostrar calculos
-            print(f"\n[DEBUG SL CALCULATION]")
-            print(f"  current_sl_pontos: {self.current_sl_pontos}")
+            print(f"\n[DEBUG SL CALCULATION] - CRITICAL CHECK")
+            print(f"  fixed_sl_dollars PARAMETRO: ${self.fixed_sl_dollars:.2f}")
             print(f"  symbol_point: {self.symbol_point}")
-            print(f"  sl_price_distance: {sl_price_distance:.3f}")
+            print(f"  current_sl_pontos: {self.current_sl_pontos}")
+            print(f"  sl_price_distance (pontos × point): {sl_price_distance:.3f}")
 
             if signal["type"] == "BUY":
                 market_price = tick['ask']  # Preco de compra
