@@ -1140,9 +1140,15 @@ class GoldLossZeroSimple:
                 return
 
             # Usar SL fixo em dólares (ao invés de ATR dinâmico)
-            # Converter $4.00 para pontos
+            # Converter $4.00 para pontos LEVANDO EM CONTA o volume
+            # Formula: sl_pontos = sl_dinheiro / (point_value * volume)
             sl_dinheiro = self.fixed_sl_dollars
-            self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
+            if self.point_value and self.volume:
+                # Calcular pontos baseado na quantidade de unidades e point_value
+                self.current_sl_pontos = sl_dinheiro / (self.point_value * self.volume)
+            else:
+                # Fallback para cálculo simples (legacy)
+                self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
 
             # Calcular SL (SEM TP - trailing cuida do lucro!)
             # VERIFICAR symbol_point antes de usar

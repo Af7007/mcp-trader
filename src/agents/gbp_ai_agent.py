@@ -86,6 +86,9 @@ class GBPAIAgent(GoldLossZeroSimple):
         # Rastreamento da última decisão
         self.last_ai_action = None
 
+        # CORRECAO FOREX: Ajustar symbol_point e point_value para GBP
+        self._adjust_forex_parameters()
+
         print("GBP AI AGENT - HIBRIDO (Forex)")
         print("   Base: Gold Loss Zero Simple (trailing stop comprovado)")
         print(f"   IA: {'Ollama habilitado' if self.ai_enabled else 'Desabilitado'}")
@@ -97,6 +100,36 @@ class GBPAIAgent(GoldLossZeroSimple):
         print("   - Volatilidade maior (Forex vs Commodities)")
         print("   - Scalping com trailing stop agressivo")
         print("   - SL e TP ajustáveis por parâmetro")
+
+    def _adjust_forex_parameters(self):
+        """
+        Ajusta parâmetros Forex (GBP, EUR, etc) para refletir a realidade da moeda
+        Moedas Forex têm estrutura completamente diferente de Commodities
+
+        GBPUSDc padrão MT5 (cents account):
+        - symbol_point: 0.0001 (4 casas decimais)
+        - point_value: $10.0 por ponto para 1 lote (100.000 * 0.0001)
+
+        Isso permite que SL e Trailing funcionem corretamente em dólares.
+        """
+        if "GBP" in self.symbol.upper():
+            # Ajustar valores para GBP
+            self.symbol_point = 0.0001  # 4 casas decimais (típico Forex)
+            self.point_value = 10.0     # $10 por ponto para 1 lote
+
+            print(f"[FOREX AJUSTADO] GBP:")
+            print(f"   symbol_point: {self.symbol_point}")
+            print(f"   point_value: ${self.point_value:.2f} por ponto (1 lote)")
+            print(f"   Com volume {self.volume}: 1 ponto = ${self.point_value * self.volume:.4f}")
+        elif "EUR" in self.symbol.upper():
+            # EUR tem mesma estrutura que GBP
+            self.symbol_point = 0.0001
+            self.point_value = 10.0
+
+            print(f"[FOREX AJUSTADO] EUR:")
+            print(f"   symbol_point: {self.symbol_point}")
+            print(f"   point_value: ${self.point_value:.2f} por ponto (1 lote)")
+            print(f"   Com volume {self.volume}: 1 ponto = ${self.point_value * self.volume:.4f}")
 
     def _get_market_data_for_ai(self) -> Optional[Dict]:
         """Obtém dados de mercado para análise da IA (otimizado para GBP)"""
