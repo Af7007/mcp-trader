@@ -180,10 +180,10 @@ class GoldAIAgent(GoldLossZeroSimple):
             # Log da decisão
             self._log_ai_decision(ai_decision, response_time, market_data)
 
-            # Se HOLD, não faça nada
+            # Se HOLD, usar fallback tradicional (M5 analysis)
             if ai_decision["action"] == "HOLD":
-                logger.info("IA recomenda AGUARDAR - nenhuma acao")
-                return
+                logger.info("IA recomenda AGUARDAR, usando metodo tradicional M5")
+                return self._analyze_traditional_fallback()
 
             # Verificar se deve abrir posição
             if not self._should_open_position(ai_decision):
