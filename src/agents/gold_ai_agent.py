@@ -486,7 +486,9 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Gold AI Agent - IA para entradas + Trailing Stop para protecao')
     parser.add_argument('--symbol', type=str, default='XAUUSDc', help='Symbol to trade')
-    parser.add_argument('--volume', type=float, default=0.02, help='Volume in lots')
+    parser.add_argument('--volume', type=float, default=0.03, help='Volume in lots')
+    parser.add_argument('--fixed-sl-dollars', type=float, default=4.0, help='Fixed stop loss in dollars')
+    parser.add_argument('--trailing-step-dollar', type=float, default=1.5, help='Trailing step in dollars')
     parser.add_argument('--model-name', type=str, default='llama3.2:1b', help='Ollama model name')
     parser.add_argument('--ai-host', type=str, default='localhost', help='Ollama host')
     parser.add_argument('--ai-port', type=int, default=11434, help='Ollama port')
@@ -498,11 +500,15 @@ if __name__ == "__main__":
     agent = GoldAIAgent(
         symbol=args.symbol,
         volume=args.volume,
+        fixed_sl_dollars=args.fixed_sl_dollars,
         ai_model_name=args.model_name,
         ai_host=args.ai_host,
         ai_port=args.ai_port,
         ai_temperature=args.ai_temperature,
         ai_enabled=not args.ai_disabled
     )
+
+    # Atualizar trailing step após inicialização
+    agent.trailing_step_dollar = args.trailing_step_dollar
     
     agent.run()

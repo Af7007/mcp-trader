@@ -41,9 +41,10 @@ class GoldLossZeroSimple:
     def __init__(
         self,
         symbol: str = "XAUUSDc",
-        volume: float = 0.02,  # GOLD: 0.02 lotes (conta cents)
+        volume: float = 0.03,  # GOLD: 0.03 lotes (aumentado de 0.02)
         check_interval: int = 15,
-        stop_loss_atr_multiplier: float = 5.0,  # GOLD: SL = ATR × 5.0 (~$2 de risco inicial)
+        stop_loss_atr_multiplier: float = 5.0,  # GOLD: SL = ATR × 5.0 (deprecated, usar fixed_sl_dollars)
+        fixed_sl_dollars: float = 4.0,  # NOVO: SL fixo em dólares ($4.00)
         use_buy: bool = True,
         use_sell: bool = True
     ):
@@ -51,8 +52,9 @@ class GoldLossZeroSimple:
         Inicializa agente Loss Zero - ESTRATÉGIA TRAILING STOP
 
         Args:
-            volume: FIXADO em 0.02 lotes (conta cents)
-            stop_loss_atr_multiplier: SL baseado em ATR × 5.0
+            volume: FIXADO em 0.03 lotes (conta cents, aumentado)
+            fixed_sl_dollars: SL fixo em $4.00
+            stop_loss_atr_multiplier: Deprecated (usar fixed_sl_dollars)
             trailing_activation_dollar: Ativa trailing com $1 de lucro
             trailing_distance_dollar: Distância do trailing = $0.5
 
@@ -74,13 +76,14 @@ class GoldLossZeroSimple:
             print(f"AVISO: Volume {volume} lotes é alto! Certifique-se de ter margem suficiente.")
         self.check_interval = check_interval
         self.sl_atr_mult = stop_loss_atr_multiplier
+        self.fixed_sl_dollars = fixed_sl_dollars  # SL fixo em dólares
         self.use_buy = use_buy
         self.use_sell = use_sell
 
         # TRAILING STOP SIMPLIFICADO - BASEADO EM DÓLARES
         self.trailing_activation_dollar = 1.0   # Ativa com $1 de lucro
         self.trailing_distance_dollar = 0.5     # Protege $0.5 inicialmente
-        self.trailing_step_dollar = 1.0          # Sobe $1 a cada $1 adicional
+        self.trailing_step_dollar = 1.5         # Sobe $1.5 a cada $1.5 adicional (era 1.0)
 
         # SL/Trailing dinâmicos calculados por ATR
         self.current_sl_pontos = 0
@@ -1136,14 +1139,10 @@ class GoldLossZeroSimple:
                 print("Erro: Nao foi possivel obter preco de mercado")
                 return
 
-            # Calcular SL e Trailing baseado em ATR (volatilidade)
-            if self.current_atr == 0:
-                self.current_atr = 120.0  # Valor padrão mais conservador
-
-            self.current_sl_pontos = self.current_atr * self.sl_atr_mult
-
-            # Calcular valores reais em dinheiro (GOLD - usa point_value)
-            sl_dinheiro = self._pontos_para_dinheiro(self.current_sl_pontos)
+            # Usar SL fixo em dólares (ao invés de ATR dinâmico)
+            # Converter $4.00 para pontos
+            sl_dinheiro = self.fixed_sl_dollars
+            self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
 
             # Calcular SL (SEM TP - trailing cuida do lucro!)
             # VERIFICAR symbol_point antes de usar
