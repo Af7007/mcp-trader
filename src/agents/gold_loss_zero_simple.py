@@ -878,26 +878,28 @@ class GoldLossZeroSimple:
                     print(f"   [BUY CONF 5] Strong price move (+1)")
 
                 # CONFIRMAÇÃO 6: Micro-trend validation (3+ candles consecutivos = movimento real)
-                # ULTRA PERMISSIVO: 3.0 com micro-trend, 4.0 sem (para scalping rápido)
-                min_score = 3.0 if micro_uptrend else 4.0
+                # EXTREMAMENTE AGRESSIVO: 2.0 com micro-trend, 3.0 sem
+                min_score = 2.0 if micro_uptrend else 3.0
                 if micro_uptrend:
                     confirmations += 0.5
                     print(f"   [BUY CONF 6] Micro-uptrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 3.0-4.0 pontos E confirmação M15 obrigatória
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("BUY")
-                    print(f"   [BUY M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
+                    # M15 é VALIDAÇÃO EXTRA, não bloqueador
                     if m15_ok:
-                        print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
-                        return {
-                            "type": "BUY",
-                            "price": current,
-                            "reason": f"M5_uptrend_follow_score_{confirmations:.1f}"
-                        }
+                        print(f"   [BUY M15] M15 confirma uptrend! Score: {confirmations}/6")
                     else:
-                        print(f"   [BUY REJECT] M15 não confirmou (score: {confirmations:.1f})")
+                        print(f"   [BUY M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
+
+                    print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
+                    return {
+                        "type": "BUY",
+                        "price": current,
+                        "reason": f"M5_uptrend_follow_score_{confirmations:.1f}"
+                    }
 
             # === SINAIS DE SELL (TREND FOLLOWING: MERCADO CAI = VENDER) ===
             # ESTRATÉGIA CORRIGIDA: Acompanhar a tendência, não apostar contra ela
@@ -936,28 +938,30 @@ class GoldLossZeroSimple:
                     print(f"   [SELL CONF 5] Strong price move (+1)")
 
                 # CONFIRMAÇÃO 6: Micro-trend validation (3+ candles consecutivos = movimento real)
-                # ULTRA PERMISSIVO: 3.0 com micro-trend, 4.0 sem (para scalping rápido)
-                min_score = 3.0 if micro_downtrend else 4.0
+                # EXTREMAMENTE AGRESSIVO: 2.0 com micro-trend, 3.0 sem
+                min_score = 2.0 if micro_downtrend else 3.0
                 if micro_downtrend:
                     confirmations += 0.5
                     print(f"   [SELL CONF 6] Micro-downtrend detected (+0.5)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 3.0-4.0 pontos E confirmação M15 obrigatória
+                # VERIFICAÇÃO FINAL: Mínimo 2.0-3.0 pontos, M15 é bonus (não obrigatório)
                 if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("SELL")
-                    print(f"   [SELL M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
+                    # M15 é VALIDAÇÃO EXTRA, não bloqueador
                     if m15_ok:
-                        print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
-                        return {
-                            "type": "SELL",
-                            "price": current,
-                            "reason": f"M5_downtrend_follow_score_{confirmations:.1f}"
-                        }
+                        print(f"   [SELL M15] M15 confirma downtrend! Score: {confirmations}/6")
                     else:
-                        print(f"   [SELL REJECT] M15 não confirmou (score: {confirmations:.1f})")
+                        print(f"   [SELL M15] M15 não confirma, mas abrindo mesmo (score: {confirmations:.1f})")
 
-            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer 3.0+ com micro-trend ou 4.0+ sem)")
+                    print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
+                    return {
+                        "type": "SELL",
+                        "price": current,
+                        "reason": f"M5_downtrend_follow_score_{confirmations:.1f}"
+                    }
+
+            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer 2.0+ com micro-trend ou 3.0+ sem)")
             return None
 
         except Exception as e:
