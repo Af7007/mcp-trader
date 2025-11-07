@@ -93,29 +93,28 @@ class GoldAIAgent(GoldLossZeroSimple):
         print(f"   Temperatura: {ai_temperature}")
         print("   Estrategia: IA decide entrada + Trailing Stop protege lucro")
         print("")
-        print("   CORRECOES APLICADAS:")
-        print("   - ATR fixo: 1000 pontos (NUNCA variara)")
-        print("   - SL controlado: $2.00 por trade")
+        print("   CONFIGURACAO OTIMIZADA:")
+        print(f"   - SL fixo: ${self.fixed_sl_dollars:.2f} por trade (parametrizavel)")
+        print(f"   - Volume: {self.volume} lotes (50% maior para scalping)")
+        print(f"   - Trailing Step: ${self.trailing_step_dollar:.2f} (maior para capturar momentum)")
         print("   - TradeRequest robusto: Zero erros")
-        print("   - TRAILING FORCADO: Verificacao em todos os ciclos")
+        print("   - TRAILING STOP: Ativacao imediata com $1.00 lucro")
         print("   - IA + Trailing: Sistema 100% funcional")
         print("")
 
     def _calculate_atr_simple(self, rates) -> float:
         """
-        ATR ULTRA LIMITADO FORCADO - NUNCA PODE EXCEDER 1200 PONTOS
-        Esta e a correcao DEFINITIVA e INELUTAVEL
+        Calcula ATR simples usando valor fixo $4.00 de SL
+        Agora o SL é controlado via fixed_sl_dollars na classe pai
         """
         try:
-            # SEMPRE FORCADO: NUNCA mais que 1200 pontos para Gold
-            resultado_forcado = 1000.0  # 1000 pontos fixos = $2.00 de SL
-            
-            print(f"   [ATR ULTRA FORCADO] Forcado: {resultado_forcado:.0f} pontos (${resultado_forcado * 0.002:.2f} SL)")
-            return resultado_forcado
+            # Usar ATR da classe pai (será usado apenas para display/inicialização)
+            # O SL real será fixed_sl_dollars ($4.00) na abertura da posição
+            return super()._calculate_atr_simple(rates)
 
         except Exception as e:
-            print(f"   [ERRO] ao calcular ATR: {e}")
-            return 1000.0  # ATR FORCADO (fallback seguro)
+            logger.error(f"Erro ao calcular ATR: {e}")
+            return 400.0  # Fallback seguro
 
     def _analyze_and_open(self):
         """
