@@ -782,24 +782,36 @@ class GoldLossZeroSimple:
             # Calcular ATR (14 períodos) para SL/TP dinâmico
             self.current_atr = self._calculate_atr_simple(rates[:14])
 
-            # === 1. TENDÊNCIA PRINCIPAL (mais rigorosa) ===
+            # === 1. TENDÊNCIA PRINCIPAL (OTIMIZADA PARA SCALPING) ===
             # Últimas 8 velas para tendência mais clara
             # CORRIGIDO: closes[0] é mais ANTIGO, closes[7] é mais RECENTE
             # Se closes[i] < closes[i+1] = preço subindo = UPTREND
             # Se closes[i] > closes[i+1] = preço caindo = DOWNTREND
-            # AUMENTADO: 6/8 (75%) para evitar detecção de trends em movimentos laterais
-            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 6  # 6/8 = 75% (era 5/8 = 62.5%)
-            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 6
+            # REBALANCEADO: 5/8 (62.5%) para mais operações, mas com validações adicionais
+            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 5  # 5/8 = 62.5%
+            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 5
+
+            # Micro-trend validation: 3+ candles consecutivos na mesma direção = movimento real
+            micro_uptrend = False
+            micro_downtrend = False
+            for i in range(5):  # Procura por 3+ candles seguidos
+                if all(closes[i+j] < closes[i+j+1] for j in range(3)):
+                    micro_uptrend = True
+                    break
+            for i in range(5):
+                if all(closes[i+j] > closes[i+j+1] for j in range(3)):
+                    micro_downtrend = True
+                    break
             
             # === 2. MOMENTUM OTIMIZADO PARA GOLD ===
             # GOLD é menos volátil, usar thresholds mais conservadores
             momentum_3m = ((current - prev_3) / prev_3) * 100  # 15 minutos
             momentum_7m = ((current - prev_7) / prev_7) * 100  # 35 minutos
             
-            # Thresholds CONSERVADORES para Gold (volatilidade menor)
-            # AUMENTADO: Mais rigoroso para evitar sinais falsos em movimentos laterais
-            MOMENTUM_STRONG = 0.25   # 0.25% = movimento significativo (era 0.15%)
-            MOMENTUM_WEAK = 0.10     # 0.10% = movimento mínimo (era 0.05%)
+            # Thresholds OTIMIZADOS PARA SCALPING rápido
+            # REBALANCEADO: Mais permissivo mas validado por micro-trends
+            MOMENTUM_STRONG = 0.15   # 0.15% = movimento significativo
+            MOMENTUM_WEAK = 0.05     # 0.05% = movimento mínimo
             
             # === 3. VOLATILIDADE E VOLUME ===
             last_range = highs[0] - lows[0]
@@ -865,8 +877,14 @@ class GoldLossZeroSimple:
                     confirmations += 1
                     print(f"   [BUY CONF 5] Strong price move (+1)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
-                if confirmations >= 5.0:
+                # CONFIRMAÇÃO 6: Micro-trend validation (3+ candles consecutivos = movimento real)
+                min_score = 4.0 if micro_uptrend else 5.0  # Mais permissivo se micro-trend existe
+                if micro_uptrend:
+                    confirmations += 0.5
+                    print(f"   [BUY CONF 6] Micro-uptrend detected (+0.5)")
+
+                # VERIFICAÇÃO FINAL: Mínimo 4.0-5.0 pontos E confirmação M15 obrigatória
+                if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("BUY")
                     print(f"   [BUY M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
@@ -916,8 +934,14 @@ class GoldLossZeroSimple:
                     confirmations += 1
                     print(f"   [SELL CONF 5] Strong price move (+1)")
 
-                # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
-                if confirmations >= 5.0:
+                # CONFIRMAÇÃO 6: Micro-trend validation (3+ candles consecutivos = movimento real)
+                min_score = 4.0 if micro_downtrend else 5.0  # Mais permissivo se micro-trend existe
+                if micro_downtrend:
+                    confirmations += 0.5
+                    print(f"   [SELL CONF 6] Micro-downtrend detected (+0.5)")
+
+                # VERIFICAÇÃO FINAL: Mínimo 4.0-5.0 pontos E confirmação M15 obrigatória
+                if confirmations >= min_score:
                     m15_ok = self._check_m15_trend("SELL")
                     print(f"   [SELL M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
@@ -931,7 +955,7 @@ class GoldLossZeroSimple:
                     else:
                         print(f"   [SELL REJECT] M15 não confirmou (score: {confirmations:.1f})")
 
-            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer minimo 5.0)")
+            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer 4.0+ com micro-trend ou 5.0+ sem)")
             return None
 
         except Exception as e:
