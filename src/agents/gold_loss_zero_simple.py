@@ -766,16 +766,18 @@ class GoldLossZeroSimple:
         """
         try:
             # Preços das últimas 15 velas (75 minutos para mais contexto)
-            closes = [r['close'] for r in rates[:15]]
-            highs = [r['high'] for r in rates[:15]]
-            lows = [r['low'] for r in rates[:15]]
-            volumes = [r['tick_volume'] for r in rates[:15]]
+            # CORREÇÃO: MT5 retorna rates[0]=mais recente, rates[14]=mais antigo
+            # Invertemos para deixar closes[0]=mais antigo, closes[14]=mais recente
+            closes = [r['close'] for r in rates[:15]][::-1]  # Inverter ordem
+            highs = [r['high'] for r in rates[:15]][::-1]
+            lows = [r['low'] for r in rates[:15]][::-1]
+            volumes = [r['tick_volume'] for r in rates[:15]][::-1]
 
-            current = closes[0]
-            prev_1 = closes[1]
-            prev_3 = closes[3]
-            prev_7 = closes[7]
-            prev_14 = closes[14]
+            current = closes[14]  # CORRIGIDO: closes[14] é o mais recente (atual)
+            prev_1 = closes[13]   # CORRIGIDO: 1 vela atrás
+            prev_3 = closes[11]   # CORRIGIDO: 3 velas atrás
+            prev_7 = closes[7]    # CORRIGIDO: 7 velas atrás
+            prev_14 = closes[0]   # CORRIGIDO: 14 velas atrás (mais antigo)
 
             # Calcular ATR (14 períodos) para SL/TP dinâmico
             self.current_atr = self._calculate_atr_simple(rates[:14])
@@ -991,7 +993,8 @@ class GoldLossZeroSimple:
             if len(rates_m15) < 4:
                 return False
 
-            closes = [r['close'] for r in rates_m15[:4]]
+            # CORREÇÃO: MT5 retorna rates[0]=mais recente, invertemos para ordem cronológica
+            closes = [r['close'] for r in rates_m15[:4]][::-1]  # closes[0]=antigo, closes[3]=recente
 
             # TREND FOLLOWING CORRETO:
             # BUY: M15 deve estar em UPTREND (preço subindo)
