@@ -101,6 +101,79 @@ class GBPAIAgent(GoldLossZeroSimple):
         print("   - Scalping com trailing stop agressivo")
         print("   - SL e TP ajustáveis por parâmetro")
 
+    def _validate_ai_signal_with_m5(self, signal_type: str) -> dict:
+        """
+        Valida sinal da IA com análise técnica M5 antes de abrir.
+        Isso evita que IA abra contra a tendência real (como aconteceu com BUY em downtrend).
+
+        Args:
+            signal_type: "BUY" ou "SELL" (decisão da IA)
+
+        Returns:
+            {"valid": bool, "reason": str}
+        """
+        try:
+            # Obter dados M5
+            rates = self.mt5.copy_rates_from_pos(
+                symbol=self.symbol,
+                timeframe="M5",
+                start_pos=0,
+                count=15
+            )
+
+            if not rates or len(rates) < 5:
+                return {"valid": False, "reason": "Dados M5 insuficientes"}
+
+            # Extrair closes e reverter ordem (MT5 retorna newest first)
+            closes = [r['close'] for r in rates[:15]][::-1]
+
+            # Calcular tendência M5
+            uptrend = sum(1 for i in range(4) if closes[i] < closes[i+1])
+            downtrend = sum(1 for i in range(4) if closes[i] > closes[i+1])
+
+            # Validar micro-trend (3+ velas consecutivas na mesma direção)
+            micro_uptrend = False
+            micro_downtrend = False
+
+            for i in range(len(closes) - 2):
+                if closes[i] < closes[i+1] < closes[i+2]:
+                    micro_uptrend = True
+                if closes[i] > closes[i+1] > closes[i+2]:
+                    micro_downtrend = True
+
+            # Verificar se sinal da IA está alinhado com tendência M5
+            if signal_type == "BUY":
+                # BUY: precisa de uptrend ou pelo menos micro-uptrend
+                if uptrend >= 3 or micro_uptrend:
+                    return {
+                        "valid": True,
+                        "reason": f"M5 uptrend confirmado (uptrend: {uptrend}, micro: {micro_uptrend})"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "reason": f"M5 em downtrend/lateral (uptrend: {uptrend}/4, micro: {micro_uptrend})"
+                    }
+
+            elif signal_type == "SELL":
+                # SELL: precisa de downtrend ou pelo menos micro-downtrend
+                if downtrend >= 3 or micro_downtrend:
+                    return {
+                        "valid": True,
+                        "reason": f"M5 downtrend confirmado (downtrend: {downtrend}, micro: {micro_downtrend})"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "reason": f"M5 em uptrend/lateral (downtrend: {downtrend}/4, micro: {micro_downtrend})"
+                    }
+
+            return {"valid": False, "reason": "Sinal desconhecido"}
+
+        except Exception as e:
+            logger.error(f"Erro ao validar sinal com M5: {e}")
+            return {"valid": False, "reason": f"Erro na validação: {e}"}
+
     def _adjust_forex_parameters(self):
         """
         Ajusta parâmetros Forex (GBP, EUR, etc) para refletir a realidade da moeda
@@ -266,14 +339,24 @@ class GBPAIAgent(GoldLossZeroSimple):
                 logger.info("Nao atende criterios para abertura de posicao")
                 return
 
+            # VALIDAÇÃO M5: Confirmar sinal da IA com análise técnica M5
+            # Isso evita que IA abra contra a tendência real
+            m5_validation = self._validate_ai_signal_with_m5(ai_decision["action"])
+
+            if not m5_validation["valid"]:
+                logger.info(f"IA recomenda {ai_decision['action']} mas M5 não confirma: {m5_validation['reason']}")
+                return self._analyze_traditional_fallback()
+
+            logger.info(f"IA + M5 confirmam {ai_decision['action']}: {m5_validation['reason']}")
+
             # Abrir posição com a decisão da IA
             signal = {
                 "type": ai_decision["action"],
                 "price": market_data["current_price"],
-                "reason": f"IA_Recommendation: {ai_decision['reasoning']}"
+                "reason": f"IA+M5_Recommendation: {ai_decision['reasoning']}"
             }
 
-            logger.info(f"Abrindo posicao baseada na IA: {ai_decision['action']}")
+            logger.info(f"Abrindo posicao baseada na IA + M5: {ai_decision['action']}")
             self._open_position(signal)
 
         except Exception as e:
