@@ -782,8 +782,11 @@ class GoldLossZeroSimple:
 
             # === 1. TENDÊNCIA PRINCIPAL (mais rigorosa) ===
             # Últimas 8 velas para tendência mais clara
-            uptrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 5  # 5/8 = 62.5%
-            downtrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 5
+            # CORRIGIDO: closes[0] é mais ANTIGO, closes[7] é mais RECENTE
+            # Se closes[i] < closes[i+1] = preço subindo = UPTREND
+            # Se closes[i] > closes[i+1] = preço caindo = DOWNTREND
+            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 5  # 5/8 = 62.5%
+            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 5
             
             # === 2. MOMENTUM OTIMIZADO PARA GOLD ===
             # GOLD é menos volátil, usar thresholds mais conservadores
@@ -971,9 +974,11 @@ class GoldLossZeroSimple:
 
     def _check_m15_trend(self, signal_type: str) -> bool:
         """
-        CORRIGIDO: Verifica tendência em M15 para confirmação
-        - BUY: M15 deve estar em DOWNTREND (mercado caindo = comprar)
-        - SELL: M15 deve estar em UPTREND (mercado subindo = vender)
+        Verifica tendência em M15 para confirmação de TREND FOLLOWING
+        - BUY: M15 deve estar em UPTREND (mercado subindo = comprar)
+        - SELL: M15 deve estar em DOWNTREND (mercado caindo = vender)
+
+        NOTA: closes[0] é mais ANTIGO, closes[3] é mais RECENTE
         """
         try:
             rates_m15 = self.mt5.copy_rates_from_pos(
@@ -988,18 +993,20 @@ class GoldLossZeroSimple:
 
             closes = [r['close'] for r in rates_m15[:4]]
 
-            # CORRIGIDO: Lógica correta para loss zero
-            # BUY: M15 deve estar em DOWNTREND (comprar na baixa)
+            # TREND FOLLOWING CORRETO:
+            # BUY: M15 deve estar em UPTREND (preço subindo)
+            # closes[0] < closes[1] < closes[2] = preço aumentando = UPTREND
             if signal_type == "BUY":
-                downtrend_m15 = closes[0] < closes[1] < closes[2]
-                print(f"   [M15 BUY CHECK] Downtrend: {downtrend_m15} | Prices: {closes[:3]}")
-                return downtrend_m15
-
-            # SELL: M15 deve estar em UPTREND (vender na alta)
-            if signal_type == "SELL":
-                uptrend_m15 = closes[0] > closes[1] > closes[2]
-                print(f"   [M15 SELL CHECK] Uptrend: {uptrend_m15} | Prices: {closes[:3]}")
+                uptrend_m15 = closes[0] < closes[1] < closes[2]
+                print(f"   [M15 BUY CHECK] Uptrend: {uptrend_m15} | Prices: {closes[:3]}")
                 return uptrend_m15
+
+            # SELL: M15 deve estar em DOWNTREND (preço caindo)
+            # closes[0] > closes[1] > closes[2] = preço diminuindo = DOWNTREND
+            if signal_type == "SELL":
+                downtrend_m15 = closes[0] > closes[1] > closes[2]
+                print(f"   [M15 SELL CHECK] Downtrend: {downtrend_m15} | Prices: {closes[:3]}")
+                return downtrend_m15
 
             return False
 
