@@ -787,8 +787,9 @@ class GoldLossZeroSimple:
             # CORRIGIDO: closes[0] é mais ANTIGO, closes[7] é mais RECENTE
             # Se closes[i] < closes[i+1] = preço subindo = UPTREND
             # Se closes[i] > closes[i+1] = preço caindo = DOWNTREND
-            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 5  # 5/8 = 62.5%
-            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 5
+            # AUMENTADO: 6/8 (75%) para evitar detecção de trends em movimentos laterais
+            uptrend = sum(1 for i in range(7) if closes[i] < closes[i+1]) >= 6  # 6/8 = 75% (era 5/8 = 62.5%)
+            downtrend = sum(1 for i in range(7) if closes[i] > closes[i+1]) >= 6
             
             # === 2. MOMENTUM OTIMIZADO PARA GOLD ===
             # GOLD é menos volátil, usar thresholds mais conservadores
@@ -796,8 +797,9 @@ class GoldLossZeroSimple:
             momentum_7m = ((current - prev_7) / prev_7) * 100  # 35 minutos
             
             # Thresholds CONSERVADORES para Gold (volatilidade menor)
-            MOMENTUM_STRONG = 0.15   # 0.15% = movimento significativo em Gold
-            MOMENTUM_WEAK = 0.05     # 0.05% = movimento mínimo
+            # AUMENTADO: Mais rigoroso para evitar sinais falsos em movimentos laterais
+            MOMENTUM_STRONG = 0.25   # 0.25% = movimento significativo (era 0.15%)
+            MOMENTUM_WEAK = 0.10     # 0.10% = movimento mínimo (era 0.05%)
             
             # === 3. VOLATILIDADE E VOLUME ===
             last_range = highs[0] - lows[0]
@@ -864,7 +866,7 @@ class GoldLossZeroSimple:
                     print(f"   [BUY CONF 5] Strong price move (+1)")
 
                 # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
-                if confirmations >= 4.5:
+                if confirmations >= 5.0:
                     m15_ok = self._check_m15_trend("BUY")
                     print(f"   [BUY M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
@@ -915,7 +917,7 @@ class GoldLossZeroSimple:
                     print(f"   [SELL CONF 5] Strong price move (+1)")
 
                 # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
-                if confirmations >= 4.5:
+                if confirmations >= 5.0:
                     m15_ok = self._check_m15_trend("SELL")
                     print(f"   [SELL M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
 
@@ -929,7 +931,7 @@ class GoldLossZeroSimple:
                     else:
                         print(f"   [SELL REJECT] M15 não confirmou (score: {confirmations:.1f})")
 
-            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente)")
+            print(f"   [M5 RESULT] Nenhum sinal válido (score insuficiente - requer minimo 5.0)")
             return None
 
         except Exception as e:
