@@ -146,6 +146,15 @@ class GoldAIAgent(GoldLossZeroSimple):
         try:
             # Obter decisão da IA
             logger.info("Consultando IA para decisao de trading...")
+
+            # LOG DOS DADOS QUE A IA VAI RECEBER
+            print(f"\n   [IA INPUT] Dados enviados para IA:")
+            print(f"      Preço: {market_data['current_price']:.3f}")
+            print(f"      Tendência: {market_data['trend_direction']}")
+            print(f"      Momentum 3m: {market_data['momentum_3m']:.3f}%")
+            print(f"      Momentum 7m: {market_data['momentum_7m']:.3f}%")
+            print(f"      Volume: {market_data['volume_current']:.0f} (avg: {market_data['volume_avg']:.0f})")
+
             start_time = time.time()
 
             additional_context = self._get_additional_context()
@@ -327,24 +336,26 @@ class GoldAIAgent(GoldLossZeroSimple):
                 return None
             
             # Calcular indicadores
-            closes = [r['close'] for r in rates_m5[:10]]
-            volumes = [r['tick_volume'] for r in rates_m5[:10]]
-            
-            # Momentum
-            current = closes[0]
-            prev_3 = closes[3] if len(closes) > 3 else closes[-1]
-            prev_7 = closes[7] if len(closes) > 7 else closes[-1]
-            
-            momentum_3m = ((current - prev_3) / prev_3) * 100
-            momentum_7m = ((current - prev_7) / prev_7) * 100
-            
-            # Volume
-            volume_current = volumes[0] if volumes else 0
-            volume_avg = sum(volumes[1:]) / len(volumes[1:]) if len(volumes) > 1 else 0
-            
-            # Tendência simples
-            uptrend = sum(1 for i in range(4) if closes[i] > closes[i+1])
-            downtrend = sum(1 for i in range(4) if closes[i] < closes[i+1])
+            # CRÍTICO: Inverter rates pois MT5 retorna com mais recente PRIMEIRO
+            closes = [r['close'] for r in rates_m5[:10]][::-1]  # closes[0]=antigo, closes[-1]=recente
+            volumes = [r['tick_volume'] for r in rates_m5[:10]][::-1]
+
+            # Momentum: current é o mais recente (closes[-1])
+            current = closes[-1]
+            prev_3 = closes[-4] if len(closes) > 3 else closes[0]
+            prev_7 = closes[-8] if len(closes) > 7 else closes[0]
+
+            momentum_3m = ((current - prev_3) / prev_3) * 100 if prev_3 != 0 else 0
+            momentum_7m = ((current - prev_7) / prev_7) * 100 if prev_7 != 0 else 0
+
+            # Volume: volume_current é o volume mais recente
+            volume_current = volumes[-1] if volumes else 0
+            volume_avg = sum(volumes[:-1]) / len(volumes[:-1]) if len(volumes) > 1 else 0
+
+            # Tendência simples: contar candles onde fechou maior que candle anterior
+            # Os índices estão corretos agora (crescente no tempo)
+            uptrend = sum(1 for i in range(len(closes)-1) if closes[i+1] > closes[i])
+            downtrend = sum(1 for i in range(len(closes)-1) if closes[i+1] < closes[i])
             
             if uptrend > downtrend:
                 trend_direction = "UP"
@@ -405,15 +416,23 @@ class GoldAIAgent(GoldLossZeroSimple):
         self.ai_decisions[decision["action"]] += 1
         self.last_ai_decision_time = time.time()
         self.last_ai_action = decision["action"]
-        
+
+        print(f"\n   [IA OUTPUT] Decisão da IA:")
+        print(f"      Ação: {decision['action']}")
+        print(f"      Confiança: {decision['confidence']:.2%}")
+        print(f"      Raciocínio: {decision['reasoning']}")
+        print(f"      Tempo: {response_time:.2f}s")
+
         logger.info("DECISAO DA IA:")
         logger.info(f"   Acao: {decision['action']}")
         logger.info(f"   Confianca: {decision['confidence']:.2f}")
         logger.info(f"   Raciocinio: {decision['reasoning']}")
         logger.info(f"   Tempo de resposta: {response_time:.2f}s")
         logger.info(f"   Preco: ${market_data['current_price']:.2f}")
+        logger.info(f"   Tendencia: {market_data['trend_direction']}")
         logger.info(f"   Momentum 3m: {market_data['momentum_3m']:.3f}%")
-        logger.info(f"   Volume: {market_data['volume_current']:.0f}")
+        logger.info(f"   Momentum 7m: {market_data['momentum_7m']:.3f}%")
+        logger.info(f"   Volume: {market_data['volume_current']:.0f} (avg: {market_data['volume_avg']:.0f})")
         
         # Estatísticas gerais
         total_decisions = sum(self.ai_decisions.values())
