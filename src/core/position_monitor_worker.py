@@ -104,7 +104,7 @@ class PositionMonitorWorker:
         Loop principal do worker.
         Executa continuamente até _stop_flag ser setado.
         """
-        logger.info(f"[WORKER] Loop iniciado para {self.symbol}")
+        logger.info(f"[WORKER] Loop iniciado para {self.symbol} (intervalo: {self.check_interval*1000:.0f}ms)")
 
         while not self._stop_flag.is_set():
             try:
@@ -116,10 +116,12 @@ class PositionMonitorWorker:
                 self._stop_flag.wait(timeout=self.check_interval)
 
             except Exception as e:
-                logger.error(f"[WORKER] Erro no loop: {e}")
+                logger.error(f"[WORKER] ERRO CRÍTICO no loop: {type(e).__name__}: {e}")
+                # NÃO sair do loop, continuar tentando mesmo com erro
+                self.total_checks += 1
                 time.sleep(self.check_interval)
 
-        logger.info(f"[WORKER] Loop finalizado para {self.symbol}")
+        logger.info(f"[WORKER] Loop finalizado para {self.symbol} (total checks: {self.total_checks})")
 
     def _check_positions(self):
         """
@@ -145,14 +147,19 @@ class PositionMonitorWorker:
             for position in positions:
                 # Chamar callback de trailing se fornecido
                 if self.trailing_callback:
-                    updated = self.trailing_callback(
-                        position=position,
-                        current_bid=current_bid,
-                        current_ask=current_ask
-                    )
+                    try:
+                        updated = self.trailing_callback(
+                            position=position,
+                            current_bid=current_bid,
+                            current_ask=current_ask
+                        )
 
-                    if updated:
-                        self.trailing_updates += 1
+                        if updated:
+                            self.trailing_updates += 1
+                    except Exception as callback_error:
+                        logger.error(f"[WORKER] Erro ao executar callback: {callback_error}")
+                        # Continuar processando outras posições mesmo com erro
+                        continue
 
         except Exception as e:
             logger.error(f"[WORKER] Erro ao checar posições: {e}")

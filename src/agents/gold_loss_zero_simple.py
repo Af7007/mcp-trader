@@ -450,8 +450,17 @@ class GoldLossZeroSimple:
 
                 # Se worker está ativo, deixa ele cuidar do trailing (20ms checks)
                 # Não faça gerenciamento duplicado no loop principal (15s)
-                if not (self.position_worker and self.position_worker.is_running()):
+                worker_is_active = self.position_worker and self.position_worker.is_running()
+
+                # DEBUG: Ver status do worker
+                if self.position_worker:
+                    print(f"   [WORKER STATUS] Existe: True | Rodando: {worker_is_active}")
+                else:
+                    print(f"   [WORKER STATUS] Existe: False")
+
+                if not worker_is_active:
                     # Worker NÃO está ativo, gerencia trailing aqui (fallback)
+                    print(f"   [WORKER] FALLBACK ATIVADO - Gerenciando trailing no loop principal")
                     for pos in positions:
                         self.last_position_ticket = pos.get('ticket')
                         self._manage_position_trailing(pos)
