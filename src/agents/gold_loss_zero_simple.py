@@ -1140,15 +1140,11 @@ class GoldLossZeroSimple:
                 return
 
             # Usar SL fixo em dólares (ao invés de ATR dinâmico)
-            # Converter $4.00 para pontos LEVANDO EM CONTA o volume
-            # Formula: sl_pontos = sl_dinheiro / (point_value * volume)
+            # Converter $4.00 para pontos MT5
+            # Formula correta: sl_pontos = sl_dinheiro / symbol_point
+            # (symbol_point é a menor variação de preço: 0.001 para Gold, 0.0001 para GBP)
             sl_dinheiro = self.fixed_sl_dollars
-            if self.point_value and self.volume:
-                # Calcular pontos baseado na quantidade de unidades e point_value
-                self.current_sl_pontos = sl_dinheiro / (self.point_value * self.volume)
-            else:
-                # Fallback para cálculo simples (legacy)
-                self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
+            self.current_sl_pontos = sl_dinheiro / self.symbol_point if self.symbol_point else 4000
 
             # Calcular SL (SEM TP - trailing cuida do lucro!)
             # VERIFICAR symbol_point antes de usar
@@ -1201,7 +1197,25 @@ class GoldLossZeroSimple:
             # Verificar se ordem foi executada (retcode 10009 = sucesso)
             if result and isinstance(result, dict):
                 retcode = result.get('retcode', -1)
-                print(f"[ORDER RESULT] retcode: {retcode}, order: {result.get('order', 0)}")
+                order_id = result.get('order', 0)
+
+                # Mapear códigos de erro MT5
+                error_messages = {
+                    10009: "TRADE_RETCODE_DONE (Sucesso)",
+                    10016: "TRADE_RETCODE_INVALID_STOPS (SL/TP inválido)",
+                    10030: "TRADE_RETCODE_INVALID_VOLUME (Volume inválido)",
+                    10015: "TRADE_RETCODE_INVALID_PRICE (Preço inválido)",
+                }
+
+                error_msg = error_messages.get(retcode, f"Erro desconhecido ({retcode})")
+                print(f"[ORDER RESULT] retcode: {retcode} - {error_msg}, order: {order_id}")
+
+                if retcode != 10009:
+                    logger.warning(f"ORDEM REJEITADA: {error_msg}")
+                    logger.warning(f"  SL calculado: ${sl_dinheiro:.2f} = {self.current_sl_pontos:.0f} pts")
+                    logger.warning(f"  SL preço: {sl_price:.4f}")
+                    logger.warning(f"  Symbol point: {self.symbol_point}")
+                    logger.warning(f"  Preço mercado: {market_price:.4f}")
 
             if result and isinstance(result, dict) and result.get('retcode') == 10009:  # TRADE_RETCODE_DONE
                 # Capturar ticket e magic number do MT5
