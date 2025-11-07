@@ -822,23 +822,24 @@ class GoldLossZeroSimple:
                 print(f"   [M5 ANALYZE] Strength: {price_strength:.3f}% | Vol: {high_volatility} | VolSpike: {volume_spike}")
                 print(f"   [M5 ANALYZE] EMA pos: fast={above_ema_fast}, slow={above_ema_slow}, trend={ema_bullish}")
 
-            # === SINAIS DE BUY (MERCADO CAI = COMPRAR) ===
+            # === SINAIS DE BUY (TREND FOLLOWING: MERCADO SOBE = COMPRAR) ===
+            # ESTRATÉGIA CORRIGIDA: Acompanhar a tendência, não apostar contra ela
             if self.use_buy:
                 confirmations = 0
-                
-                # CONFIRMAÇÃO 1: Tendência de baixa clara
-                if downtrend:
+
+                # CONFIRMAÇÃO 1: Tendência de ALTA clara (CORRETO: uptrend = comprar)
+                if uptrend:  # CORRIGIDO: era downtrend
                     confirmations += 2  # 2 pontos para tendência forte
-                    print(f"   [BUY CONF 1] Downtrend detectado (+2)")
-                
-                # CONFIRMAÇÃO 2: Momentum negativo forte
-                if momentum_3m < -MOMENTUM_STRONG or momentum_7m < -MOMENTUM_STRONG:
+                    print(f"   [BUY CONF 1] Uptrend detectado (+2)")
+
+                # CONFIRMAÇÃO 2: Momentum POSITIVO forte
+                if momentum_3m > MOMENTUM_STRONG or momentum_7m > MOMENTUM_STRONG:  # CORRIGIDO: era <
                     confirmations += 2  # 2 pontos para momentum forte
-                    print(f"   [BUY CONF 2] Strong bearish momentum (+2)")
-                elif momentum_3m < -MOMENTUM_WEAK or momentum_7m < -MOMENTUM_WEAK:
+                    print(f"   [BUY CONF 2] Strong bullish momentum (+2)")
+                elif momentum_3m > MOMENTUM_WEAK or momentum_7m > MOMENTUM_WEAK:  # CORRIGIDO: era <
                     confirmations += 1  # 1 ponto para momentum fraco
-                    print(f"   [BUY CONF 2] Weak bearish momentum (+1)")
-                
+                    print(f"   [BUY CONF 2] Weak bullish momentum (+1)")
+
                 # CONFIRMAÇÃO 3: Volume confirmado
                 if volume_spike:
                     confirmations += 1
@@ -846,49 +847,50 @@ class GoldLossZeroSimple:
                 elif high_volatility:
                     confirmations += 0.5  # 0.5 pontos para volatilidade
                     print(f"   [BUY CONF 3] High volatility (+0.5)")
-                
-                # CONFIRMAÇÃO 4: Preço abaixo das médias
-                if not above_ema_fast and not above_ema_slow:
+
+                # CONFIRMAÇÃO 4: Preço ACIMA das médias (CORRIGIDO: era abaixo)
+                if above_ema_fast and above_ema_slow:  # CORRIGIDO: era "not above"
                     confirmations += 1
-                    print(f"   [BUY CONF 4] Price below EMAs (+1)")
-                
+                    print(f"   [BUY CONF 4] Price above EMAs (+1)")
+
                 # CONFIRMAÇÃO 5: Força do movimento
                 if price_strength > 0.10:  # 0.10% em 20 minutos
                     confirmations += 1
                     print(f"   [BUY CONF 5] Strong price move (+1)")
-                
+
                 # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
                 if confirmations >= 4.5:
                     m15_ok = self._check_m15_trend("BUY")
                     print(f"   [BUY M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
-                    
+
                     if m15_ok:
                         print(f"   [BUY SIGNAL] Confirmado! Score: {confirmations}/6")
                         return {
-                            "type": "BUY", 
-                            "price": current, 
-                            "reason": f"M5_conservative_buy_score_{confirmations:.1f}"
+                            "type": "BUY",
+                            "price": current,
+                            "reason": f"M5_uptrend_follow_score_{confirmations:.1f}"
                         }
                     else:
                         print(f"   [BUY REJECT] M15 não confirmou (score: {confirmations:.1f})")
 
-            # === SINAIS DE SELL (MERCADO SOBE = VENDER) ===
+            # === SINAIS DE SELL (TREND FOLLOWING: MERCADO CAI = VENDER) ===
+            # ESTRATÉGIA CORRIGIDA: Acompanhar a tendência, não apostar contra ela
             if self.use_sell:
                 confirmations = 0
-                
-                # CONFIRMAÇÃO 1: Tendência de alta clara
-                if uptrend:
+
+                # CONFIRMAÇÃO 1: Tendência de BAIXA clara (CORRETO: downtrend = vender)
+                if downtrend:  # CORRIGIDO: era uptrend
                     confirmations += 2  # 2 pontos para tendência forte
-                    print(f"   [SELL CONF 1] Uptrend detectado (+2)")
-                
-                # CONFIRMAÇÃO 2: Momentum positivo forte
-                if momentum_3m > MOMENTUM_STRONG or momentum_7m > MOMENTUM_STRONG:
+                    print(f"   [SELL CONF 1] Downtrend detectado (+2)")
+
+                # CONFIRMAÇÃO 2: Momentum NEGATIVO forte
+                if momentum_3m < -MOMENTUM_STRONG or momentum_7m < -MOMENTUM_STRONG:  # CORRIGIDO: era >
                     confirmations += 2  # 2 pontos para momentum forte
-                    print(f"   [SELL CONF 2] Strong bullish momentum (+2)")
-                elif momentum_3m > MOMENTUM_WEAK or momentum_7m > MOMENTUM_WEAK:
+                    print(f"   [SELL CONF 2] Strong bearish momentum (+2)")
+                elif momentum_3m < -MOMENTUM_WEAK or momentum_7m < -MOMENTUM_WEAK:  # CORRIGIDO: era >
                     confirmations += 1  # 1 ponto para momentum fraco
-                    print(f"   [SELL CONF 2] Weak bullish momentum (+1)")
-                
+                    print(f"   [SELL CONF 2] Weak bearish momentum (+1)")
+
                 # CONFIRMAÇÃO 3: Volume confirmado
                 if volume_spike:
                     confirmations += 1
@@ -896,28 +898,28 @@ class GoldLossZeroSimple:
                 elif high_volatility:
                     confirmations += 0.5  # 0.5 pontos para volatilidade
                     print(f"   [SELL CONF 3] High volatility (+0.5)")
-                
-                # CONFIRMAÇÃO 4: Preço acima das médias
-                if above_ema_fast and above_ema_slow:
+
+                # CONFIRMAÇÃO 4: Preço ABAIXO das médias (CORRIGIDO: era acima)
+                if not above_ema_fast and not above_ema_slow:  # CORRIGIDO: era "above_ema"
                     confirmations += 1
-                    print(f"   [SELL CONF 4] Price above EMAs (+1)")
-                
+                    print(f"   [SELL CONF 4] Price below EMAs (+1)")
+
                 # CONFIRMAÇÃO 5: Força do movimento
                 if price_strength > 0.10:  # 0.10% em 20 minutos
                     confirmations += 1
                     print(f"   [SELL CONF 5] Strong price move (+1)")
-                
+
                 # VERIFICAÇÃO FINAL: Mínimo 4.5 pontos E confirmação M15 obrigatória
                 if confirmations >= 4.5:
                     m15_ok = self._check_m15_trend("SELL")
                     print(f"   [SELL M15] Confirmação M15: {'SIM' if m15_ok else 'NÃO'}")
-                    
+
                     if m15_ok:
                         print(f"   [SELL SIGNAL] Confirmado! Score: {confirmations}/6")
                         return {
-                            "type": "SELL", 
-                            "price": current, 
-                            "reason": f"M5_conservative_sell_score_{confirmations:.1f}"
+                            "type": "SELL",
+                            "price": current,
+                            "reason": f"M5_downtrend_follow_score_{confirmations:.1f}"
                         }
                     else:
                         print(f"   [SELL REJECT] M15 não confirmou (score: {confirmations:.1f})")
