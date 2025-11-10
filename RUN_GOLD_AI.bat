@@ -8,9 +8,13 @@ echo  ATENCAO: Este agente opera com DINHEIRO REAL!
 echo.
 echo  Configuracao:
 echo    - Simbolo: XAUUSDc (Ouro)
-echo    - Volume: 0.03 lots
-echo    - SL Fixo: $4.00
-echo    - Trailing Step: $1.5
+echo    - Volume: 0.02 lots (ajustavel)
+echo    - SL DINAMICO: ATR * 150 (min $4, max $10) - Adapta a volatilidade
+echo    - PROTECAO PROGRESSIVA v1.4.0 (Worker 20ms):
+echo       * $1 lucro -^> Break-even (protege $0)
+echo       * $3 lucro -^> Trailing (protege $1)
+echo       * $5 lucro -^> Trailing (protege $3)
+echo       * Formula: protecao = lucro - $2
 echo    - IA: Ollama Local (llama3.2:1b)
 echo    - Estrategia: IA decide entrada + Trailing Stop protege lucro
 echo    - Fallback: Metodo tradicional se IA falhar
@@ -67,8 +71,8 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM Executar agente
-title GOLD_AI_AGENT - XAUUSDc
-uv run python src\agents\gold_ai_agent.py --symbol XAUUSDc --volume 0.03 --fixed-sl-dollars 4.0 --trailing-step-dollar 1.5 --model-name llama3.2:1b
+title GOLD_AI_AGENT - XAUUSDc (Trailing Otimizado)
+uv run python src\agents\gold_ai_agent.py --symbol XAUUSDc --volume 0.02 --fixed-sl-dollars 5.0 --model-name llama3.2:1b
 
 echo.
 echo ============================================================
