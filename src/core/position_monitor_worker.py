@@ -79,6 +79,9 @@ class PositionMonitorWorker:
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
+        # Dar um tempo mínimo para a thread iniciar (important para is_alive() funcionar)
+        time.sleep(0.1)
+
         logger.info(f"Worker iniciado para {self.symbol}")
 
     def stop(self):

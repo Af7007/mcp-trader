@@ -34,7 +34,7 @@ class TesteOrdemDiretaVolume02(GoldLossZeroSimple):
         # CORREÇÃO: Volume 0.02 lote (AJUSTADO conforme solicitado)
         kwargs.update({
             'check_interval': 2,  # Verifica a cada 2 segundos
-            'volume': 0.02,      # VOLUME AJUSTADO: 0.02 lote
+            'volume': 0.02,      # VOLUME AJUSTADO: 0.02 lote (conforme solicitado)
             'use_buy': True,     # Permite BUY e SELL
             'use_sell': True
         })

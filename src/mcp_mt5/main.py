@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+# Add src to path for imports FIRST
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -7,8 +12,11 @@ import pandas as pd
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from core.mt5_connection import mt5_connection
+from core.mt5_direct_client import get_mt5_client
 from core.exceptions import MT5ConnectionError, MT5InitializationError, MT5LoginError
+
+# Initialize MT5 connection
+mt5_connection = get_mt5_client()
 
 logger = logging.getLogger(__name__)
 
@@ -1023,23 +1031,29 @@ def history_orders_get(
     Returns:
         List[HistoryOrder]: List of historical orders.
     """
-    request = {}
-    if symbol is not None:
-        request["symbol"] = symbol
-    if group is not None:
-        request["group"] = group
-    if ticket is not None:
-        request["ticket"] = ticket
-    if position is not None:
-        request["position"] = position
-    if from_date is not None:
-        request["from"] = from_date
-    if to_date is not None:
-        request["to"] = to_date
+    # MT5 history_orders_get accepts multiple call patterns:
+    # 1. No args: mt5.history_orders_get() - returns all history
+    # 2. Date range (positional): mt5.history_orders_get(date_from, date_to)
+    # 3. Filters (positional): mt5.history_orders_get(group=..., ticket=..., position=...)
 
-    # Get history orders
-    if request:
+    orders = None
+
+    # If date range is specified, use positional arguments (required by MT5)
+    if from_date is not None and to_date is not None:
+        orders = mt5.history_orders_get(from_date, to_date)
+    # If only filters are specified, use named arguments
+    elif symbol is not None or group is not None or ticket is not None or position is not None:
+        request = {}
+        if symbol is not None:
+            request["symbol"] = symbol
+        if group is not None:
+            request["group"] = group
+        if ticket is not None:
+            request["ticket"] = ticket
+        if position is not None:
+            request["position"] = position
         orders = mt5.history_orders_get(**request)
+    # No parameters - get all history
     else:
         orders = mt5.history_orders_get()
 
@@ -1080,23 +1094,29 @@ def history_deals_get(
     Returns:
         List[Deal]: List of historical deals.
     """
-    request = {}
-    if symbol is not None:
-        request["symbol"] = symbol
-    if group is not None:
-        request["group"] = group
-    if ticket is not None:
-        request["ticket"] = ticket
-    if position is not None:
-        request["position"] = position
-    if from_date is not None:
-        request["from"] = from_date
-    if to_date is not None:
-        request["to"] = to_date
+    # MT5 history_deals_get accepts multiple call patterns:
+    # 1. No args: mt5.history_deals_get() - returns all history
+    # 2. Date range (positional): mt5.history_deals_get(date_from, date_to)
+    # 3. Filters (positional): mt5.history_deals_get(group=..., ticket=..., position=...)
 
-    # Get history deals
-    if request:
+    deals = None
+
+    # If date range is specified, use positional arguments (required by MT5)
+    if from_date is not None and to_date is not None:
+        deals = mt5.history_deals_get(from_date, to_date)
+    # If only filters are specified, use named arguments
+    elif symbol is not None or group is not None or ticket is not None or position is not None:
+        request = {}
+        if symbol is not None:
+            request["symbol"] = symbol
+        if group is not None:
+            request["group"] = group
+        if ticket is not None:
+            request["ticket"] = ticket
+        if position is not None:
+            request["position"] = position
         deals = mt5.history_deals_get(**request)
+    # No parameters - get all history
     else:
         deals = mt5.history_deals_get()
 

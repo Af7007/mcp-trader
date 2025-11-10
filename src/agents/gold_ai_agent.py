@@ -9,6 +9,7 @@ import time
 import logging
 from pathlib import Path
 from typing import Dict, Optional
+import pandas as pd
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -96,7 +97,7 @@ class GoldAIAgent(GoldLossZeroSimple):
         print("   CONFIGURACAO OTIMIZADA:")
         print(f"   - SL fixo: ${self.fixed_sl_dollars:.2f} por trade (parametrizavel)")
         print(f"   - Volume: {self.volume} lotes (50% maior para scalping)")
-        print(f"   - Trailing Step: ${self.trailing_step_dollar:.2f} (maior para capturar momentum)")
+        print(f"   - Trailing Step: ${self.trailing_distance_dollar:.2f} (maior para capturar momentum)")
         print("   - TradeRequest robusto: Zero erros")
         print("   - TRAILING STOP: Ativacao imediata com $1.00 lucro")
         print("   - IA + Trailing: Sistema 100% funcional")
@@ -339,18 +340,37 @@ class GoldAIAgent(GoldLossZeroSimple):
                 symbol=self.symbol,
                 timeframe="M5",
                 start_pos=0,
-                count=20
+                count=50  # Aumentado para ter dados suficientes para EMAs
             )
             
-            if not rates_m5 or len(rates_m5) < 5:
+            if not rates_m5 or len(rates_m5) < 30: # Garantir dados para EMA(26)
                 return None
             
-            # Calcular indicadores
-            # CRÍTICO: Inverter rates pois MT5 retorna com mais recente PRIMEIRO
-            closes = [r['close'] for r in rates_m5[:10]][::-1]  # closes[0]=antigo, closes[-1]=recente
-            volumes = [r['tick_volume'] for r in rates_m5[:10]][::-1]
+            # Usar pandas para facilitar cálculos
+            df = pd.DataFrame(rates_m5)
+            df = df.iloc[::-1].reset_index(drop=True) # Inverter para ordem cronológica
+
+            # --- NOVA LÓGICA DE TENDÊNCIA COM EMAs ---
+            ema_fast_period = 12
+            ema_slow_period = 26
+            df['ema_fast'] = df['close'].ewm(span=ema_fast_period, adjust=False).mean()
+            df['ema_slow'] = df['close'].ewm(span=ema_slow_period, adjust=False).mean()
+
+            # Pegar os valores mais recentes
+            last_ema_fast = df['ema_fast'].iloc[-1]
+            last_ema_slow = df['ema_slow'].iloc[-1]
+
+            # Definir a tendência com base no cruzamento de EMAs
+            if last_ema_fast > last_ema_slow:
+                trend_direction = "UP"
+            elif last_ema_fast < last_ema_slow:
+                trend_direction = "DOWN"
+            else:
+                trend_direction = "LATERAL"
+            # --- FIM DA NOVA LÓGICA ---
 
             # Momentum: current é o mais recente (closes[-1])
+            closes = df['close'].tolist()
             current = closes[-1]
             prev_3 = closes[-4] if len(closes) > 3 else closes[0]
             prev_7 = closes[-8] if len(closes) > 7 else closes[0]
@@ -359,20 +379,9 @@ class GoldAIAgent(GoldLossZeroSimple):
             momentum_7m = ((current - prev_7) / prev_7) * 100 if prev_7 != 0 else 0
 
             # Volume: volume_current é o volume mais recente
-            volume_current = volumes[-1] if volumes else 0
-            volume_avg = sum(volumes[:-1]) / len(volumes[:-1]) if len(volumes) > 1 else 0
-
-            # Tendência simples: contar candles onde fechou maior que candle anterior
-            # Os índices estão corretos agora (crescente no tempo)
-            uptrend = sum(1 for i in range(len(closes)-1) if closes[i+1] > closes[i])
-            downtrend = sum(1 for i in range(len(closes)-1) if closes[i+1] < closes[i])
-            
-            if uptrend > downtrend:
-                trend_direction = "UP"
-            elif downtrend > uptrend:
-                trend_direction = "DOWN"
-            else:
-                trend_direction = "LATERAL"
+            volumes = df['tick_volume'].tolist()
+            volume_current = volumes[-1]
+            volume_avg = sum(volumes[:-1]) / len(volumes[:-1])
             
             return {
                 "current_price": current_price,
@@ -500,29 +509,29 @@ class GoldAIAgent(GoldLossZeroSimple):
 
             # Verificar se sinal da IA está alinhado com tendência M5
             if signal_type == "BUY":
-                # BUY: precisa de uptrend ou pelo menos micro-uptrend
-                if uptrend or micro_uptrend:
+                # BUY: precisa de uptrend E micro-uptrend (ambos confirmam)
+                if uptrend and micro_uptrend:
                     return {
                         "valid": True,
-                        "reason": f"M5 uptrend confirmado (uptrend: {uptrend}, micro: {micro_uptrend})"
+                        "reason": f"M5 uptrend+micro confirmados (uptrend: {uptrend}, micro: {micro_uptrend})"
                     }
                 else:
                     return {
                         "valid": False,
-                        "reason": f"M5 em downtrend/lateral (rejeita BUY)"
+                        "reason": f"M5 requer uptrend E micro-uptrend (uptrend: {uptrend}, micro: {micro_uptrend})"
                     }
 
             elif signal_type == "SELL":
-                # SELL: precisa de downtrend ou pelo menos micro-downtrend
-                if downtrend or micro_downtrend:
+                # SELL: precisa de downtrend E micro-downtrend (ambos confirmam)
+                if downtrend and micro_downtrend:
                     return {
                         "valid": True,
-                        "reason": f"M5 downtrend confirmado (downtrend: {downtrend}, micro: {micro_downtrend})"
+                        "reason": f"M5 downtrend+micro confirmados (downtrend: {downtrend}, micro: {micro_downtrend})"
                     }
                 else:
                     return {
                         "valid": False,
-                        "reason": f"M5 em uptrend/lateral (rejeita SELL)"
+                        "reason": f"M5 requer downtrend E micro-downtrend (downtrend: {downtrend}, micro: {micro_downtrend})"
                     }
 
             return {"valid": False, "reason": "Sinal desconhecido"}
@@ -610,6 +619,5 @@ if __name__ == "__main__":
     )
 
     # Atualizar trailing step após inicialização
-    agent.trailing_step_dollar = args.trailing_step_dollar
     
     agent.run()

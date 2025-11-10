@@ -76,10 +76,10 @@ class OllamaClient:
             start_time = time.time()
             
             response = requests.post(
-                f"{self.base_url}/api/generate", 
-                headers=self.headers, 
+                f"{self.base_url}/api/generate",
+                headers=self.headers,
                 json=data,
-                timeout=30  # Timeout após 30 segundos
+                timeout=10  # Timeout aumentado para 10s (era 5s, dava timeout)
             )
             
             end_time = time.time()
@@ -123,8 +123,8 @@ class OllamaClient:
 
             response = self.generate(
                 prompt=prompt,
-                temperature=0.1,  # Baixa temperatura para decisões mais consistentes
-                max_tokens=20     # Resposta curta
+                temperature=0.5,  # Temperatura mais alta = mais rapido (menos "pensamento")
+                max_tokens=5      # Resposta MINIMA - apenas 1 palavra (BUY/SELL/HOLD)
             )
 
             if not response or response.strip() == "":
@@ -164,41 +164,14 @@ class OllamaClient:
         volume_avg = market_data.get('volume_avg', 0)
         trend_direction = market_data.get('trend_direction', 'LATERAL')
         
-        prompt = f"""
-        Você é um especialista em trading de ouro (XAUUSD). Analise os seguintes dados de mercado:
+        # PROMPT MINIMO - Resposta em <2s!
+        prompt = f"""BTC ${current_price:.0f}
+Trend: {trend_direction}
+Mom: {momentum_3m:+.2f}%
 
-        PREÇO ATUAL: ${current_price:.2f}
-        ATR (Volatilidade): {atr:.0f} pontos
-        Momentum 3min: {momentum_3m:.3f}%
-        Momentum 7min: {momentum_7m:.3f}%
-        Volume atual: {volume_current}
-        Volume médio: {volume_avg:.0f}
-        Tendência: {trend_direction}
+Rule: {trend_direction}+{'+' if momentum_3m > 0 else '-'}Mom = {'BUY' if trend_direction == 'UP' and momentum_3m > 0 else 'SELL' if trend_direction == 'DOWN' and momentum_3m < 0 else 'HOLD'}?
 
-        Contexto adicional: {additional_context}
-
-        REGRAS CRÍTICAS (NÃO VIOLE!):
-        1. NUNCA aposte CONTRA a tendência!
-           - Se Tendência = UP: ONLY BUY (momentum precisa ser positivo)
-           - Se Tendência = DOWN: ONLY SELL (momentum precisa ser negativo)
-           - Se Tendência = LATERAL: Responda HOLD (sem sinal claro)
-
-        2. Estratégia = TREND FOLLOWING (acompanhe, não contrarie)
-           - UP + momentum positivo = BUY (SEGURO)
-           - DOWN + momentum negativo = SELL (SEGURO)
-           - Qualquer conflito = HOLD (evite risco)
-
-        3. Rejeite sinais contraditórios
-           - UP com momentum negativo = HOLD
-           - DOWN com momentum positivo = HOLD
-
-        COM BASE NESSAS INFORMAÇÕES, RECOMENDE UMA AÇÃO:
-        - BUY: APENAS se Tendência = UP E momentum > 0
-        - SELL: APENAS se Tendência = DOWN E momentum < 0
-        - HOLD: Qualquer outra situação (segurança primeiro)
-
-        RESPONDA APENAS COM A PALAVRA: BUY, SELL ou HOLD
-        """
+Answer (1 word):"""
         
         return prompt
     

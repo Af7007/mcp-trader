@@ -520,15 +520,13 @@ class GoldLossZeroSimple:
         """
         try:
             # Preços das últimas 10 velas (50 minutos)
-            closes = [r['close'] for r in rates[:10]]
-            highs = [r['high'] for r in rates[:10]]
-            lows = [r['low'] for r in rates[:10]]
-            volumes = [r['tick_volume'] for r in rates[:10]]
+            closes = [r['close'] for r in rates[:6]]
+            highs = [r['high'] for r in rates[:6]]
+            lows = [r['low'] for r in rates[:6]]
+            volumes = [r['tick_volume'] for r in rates[:6]]
 
             current = closes[0]
             prev_1 = closes[1]
-            prev_2 = closes[2]
-            prev_5 = closes[5]
 
             # Calcular ATR (14 períodos) para SL/TP dinâmico
             self.current_atr = self._calculate_atr_simple(rates[:14])
@@ -537,8 +535,8 @@ class GoldLossZeroSimple:
             uptrend = sum(1 for i in range(4) if closes[i] > closes[i+1]) >= 3
             downtrend = sum(1 for i in range(4) if closes[i] < closes[i+1]) >= 3
 
-            # 2. MOMENTUM REALISTA (mudança % nos últimos 5 min)
-            momentum_5m = ((current - prev_5) / prev_5) * 100
+            # 2. MOMENTUM M1 (mudança % nos últimos 3 min)
+            momentum_1m = ((current - closes[2]) / closes[2]) * 100 if closes[2] > 0 else 0
 
             # 3. VOLATILIDADE
             last_range = highs[0] - lows[0]
@@ -555,52 +553,41 @@ class GoldLossZeroSimple:
 
             # LOG de análise
             import random
-            if random.random() < 0.2:
-                print(f"   [M5] Mom: {momentum_5m:.3f}% | ATR: {self.current_atr:.1f} | Trend: {'UP' if uptrend else 'DOWN' if downtrend else 'LATERAL'}")
+            if random.random() < 0.3: # Log mais frequente
+                print(f"   [ANÁLISE M1] Mom: {momentum_1m:.3f}% | Vol: {high_volatility} | Volume: {volume_spike} | Trend: {'UP' if uptrend else 'DOWN' if downtrend else 'LATERAL'}")
 
             # === THRESHOLDS OTIMIZADOS PARA GOLD ===
-            # GOLD: Volatilidade menor que BTC
-            MOMENTUM_BUY = 0.03   # 0.03% = ~$0.78 movimento em Gold $2,600
-            MOMENTUM_SELL = -0.03
+            MOMENTUM_BUY = 0.08   # Movimento rápido em M1
+            MOMENTUM_SELL = -0.08
 
-            # === SINAIS DE BUY - 2 CONFIRMAÇÕES (balanceado) ===
+            # === SINAIS DE BUY - Mínimo 3 pontos ===
             if self.use_buy:
-                confirmations = 0
+                score = 0
+                if uptrend: score += 1.5
+                if momentum_1m > MOMENTUM_BUY: score += 2.5
+                elif momentum_1m > MOMENTUM_BUY * 0.6: score += 1.0 # Momentum médio
+                if volume_spike: score += 1.0
+                if high_volatility: score += 1.0
 
-                if uptrend and momentum_5m > MOMENTUM_BUY:
-                    confirmations += 1
-                if momentum_5m > MOMENTUM_BUY * 1.5:  # 0.06%
-                    confirmations += 1
-                if (high_volatility or volume_spike) and current > prev_1 and price_above_avg:  # RELAXADO: OR
-                    confirmations += 1
+                if score >= 3:
+                    return {"type": "BUY", "price": current, "reason": f"M1_BUY_Score_{score:.1f}"}
 
-                # AJUSTADO: 2 confirmações (meio termo)
-                if confirmations >= 2:
-                    # VERIFICAR TENDÊNCIA M15 (timeframe maior)
-                    if self._check_m15_trend("BUY"):
-                        return {"type": "BUY", "price": current, "reason": "M5_M15_confirmed_buy"}
-
-            # === SINAIS DE SELL - 2 CONFIRMAÇÕES (balanceado) ===
+            # === SINAIS DE SELL - Mínimo 3 pontos ===
             if self.use_sell:
-                confirmations = 0
+                score = 0
+                if downtrend: score += 1.5
+                if momentum_1m < MOMENTUM_SELL: score += 2.5
+                elif momentum_1m < MOMENTUM_SELL * 0.6: score += 1.0
+                if volume_spike: score += 1.0
+                if high_volatility: score += 1.0
 
-                if downtrend and momentum_5m < MOMENTUM_SELL:
-                    confirmations += 1
-                if momentum_5m < MOMENTUM_SELL * 1.5:  # -0.06%
-                    confirmations += 1
-                if (high_volatility or volume_spike) and current < prev_1 and price_below_avg:  # RELAXADO: OR
-                    confirmations += 1
-
-                # AJUSTADO: 2 confirmações (meio termo)
-                if confirmations >= 2:
-                    # VERIFICAR TENDÊNCIA M15 (timeframe maior)
-                    if self._check_m15_trend("SELL"):
-                        return {"type": "SELL", "price": current, "reason": "M5_M15_confirmed_sell"}
+                if score >= 3:
+                    return {"type": "SELL", "price": current, "reason": f"M1_SELL_Score_{score:.1f}"}
 
             return None
 
         except Exception as e:
-            print(f"Erro na analise M5: {e}")
+            print(f"Erro na analise M1: {e}")
             return None
 
     def _calculate_atr_simple(self, rates) -> float:
